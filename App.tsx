@@ -30,82 +30,57 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return {
-           ...parsed,
-           companies: parsed.companies?.length > 0 ? parsed.companies : COMPANIES,
-           timestamps: parsed.timestamps || {}
-        };
-      } catch (e) { console.error("Cache error:", e); }
+        return { ...parsed, companies: parsed.companies?.length > 0 ? parsed.companies : COMPANIES, timestamps: parsed.timestamps || {} };
+      } catch (e) { console.error(e); }
     }
-    return {
-      companies: COMPANIES, news: NEWS, events: EVENTS, documents: DOCUMENTS, companyDocuments: {},
-      analysis: "", marketOpportunities: [], marketRisks: [], lastUpdated: 'Initialisation...',
-      timestamps: {}
-    };
+    return { companies: COMPANIES, news: NEWS, events: EVENTS, documents: DOCUMENTS, companyDocuments: {}, analysis: "", marketOpportunities: [], marketRisks: [], lastUpdated: 'Initialisation...', timestamps: {} };
   });
 
   useEffect(() => {
     const now = Date.now();
-    if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) {
-      refreshData();
-    }
+    if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) refreshData();
   }, []);
 
   const refreshData = async (targetTickers?: string[]) => {
     setLoading(true);
     setLoadingStatus('Synchronisation financière...');
     try {
-      const tickersToFetch = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
-      const syncResult = await fetchRealTimeOOHData(tickersToFetch);
+      const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
+      const syncResult = await fetchRealTimeOOHData(tickers);
       
       setData(prev => {
-        const mergedCompanies = prev.companies.map(base => {
-          const update = syncResult.companies.find((u: any) => 
-            u.ticker.replace(/_/g, '.').toUpperCase() === base.ticker?.toUpperCase()
-          );
+        const merged = prev.companies.map(base => {
+          const u = syncResult.companies.find((x: any) => x.ticker.toUpperCase() === base.ticker?.toUpperCase());
+          if (!u) return base;
           
-          if (update) {
-            const mktCap = parseFinancialValue(update.marketCap);
-            const netDebt = parseFinancialValue(update.netDebt);
-            const ev = calculateEV(mktCap, netDebt);
+          const mkt = parseFinancialValue(u.marketCap), debt = parseFinancialValue(u.netDebt), ev = calculateEV(mkt, debt);
+          const getV = (val: any) => parseFinancialValue(val);
+          const r24 = getV(u.revenue2024), r25 = getV(u.revenue2025), r26 = getV(u.revenue2026);
+          const eb24 = getV(u.ebitda2024), eb25 = getV(u.ebitda2025), eb26 = getV(u.ebitda2026);
+          const ebit24 = getV(u.ebit2024), ebit25 = getV(u.ebit2025), ebit26 = getV(u.ebit2026);
+          const inc24 = getV(u.netIncome2024), inc25 = getV(u.netIncome2025), inc26 = getV(u.netIncome2026);
+          const cap24 = getV(u.capex2024), cap25 = getV(u.capex2025), cap26 = getV(u.capex2026);
 
-            const getV = (v: any) => parseFinancialValue(v);
-            const r24 = getV(update.revenue2024), r25 = getV(update.revenue2025), r26 = getV(update.revenue2026);
-            const eb24 = getV(update.ebitda2024), eb25 = getV(update.ebitda2025), eb26 = getV(update.ebitda2026);
-            const ebit24 = getV(update.ebit2024), ebit25 = getV(update.ebit2025), ebit26 = getV(update.ebit2026);
-            const inc24 = getV(update.netIncome2024), inc25 = getV(update.netIncome2025), inc26 = getV(update.netIncome2026);
-            const cap24 = getV(update.capex2024), cap25 = getV(update.capex2025), cap26 = getV(update.capex2026);
-
-            const cM = (n: number, d: number) => (d > 0 ? n / d : 0);
-            
-            return { 
-              ...base, ...update, 
-              ev: ev > 0 ? `${ev.toFixed(0)} M` : base.ev,
-              evEbitda: cM(ev, eb24), evEbitdaForward: cM(ev, eb25), evEbitdaNext: cM(ev, eb26),
-              evEbit: cM(ev, ebit24), evEbitForward: cM(ev, ebit25), evEbitNext: cM(ev, ebit26),
-              evSales: cM(ev, r24), evSalesForward: cM(ev, r25), evSalesNext: cM(ev, r26),
-              per: cM(mktCap, inc24), perForward: cM(mktCap, inc25), perNext: cM(mktCap, inc26),
-              evEbitdaCapex: cM(ev, (eb24 - cap24)),
-              evEbitdaCapexForward: cM(ev, (eb25 - cap25)),
-              evEbitdaCapexNext: cM(ev, (eb26 - cap26)),
-              ebitdaMargin: eb24 > 0 ? (eb24 / r24) * 100 : 0,
-              // Pour le benchmark de rendement
-              dividendYieldNumeric: parsePercent(update.dividendYield)
-            };
-          }
-          return base;
+          const div = (n: number, d: number) => (d > 0 ? n / d : 0);
+          
+          return { 
+            ...base, ...u, 
+            ev: ev > 0 ? `${ev.toFixed(0)} M` : base.ev,
+            evEbitda: div(ev, eb24), evEbitdaForward: div(ev, eb25), evEbitdaNext: div(ev, eb26),
+            evEbit: div(ev, ebit24), evEbitForward: div(ev, ebit25), evEbitNext: div(ev, ebit26),
+            evSales: div(ev, r24), evSalesForward: div(ev, r25), evSalesNext: div(ev, r26),
+            per: div(mkt, inc24), perForward: div(mkt, inc25), perNext: div(mkt, inc26),
+            evEbitdaCapex: div(ev, (eb24 - cap24)), evEbitdaCapexForward: div(ev, (eb25 - cap25)), evEbitdaCapexNext: div(ev, (eb26 - cap26)),
+            ebitdaMargin: eb24 > 0 ? (eb24 / r24) * 100 : 0,
+            dividendYieldNumeric: parsePercent(u.dividendYield)
+          };
         });
 
-        const next = { 
-          ...prev, 
-          companies: mergedCompanies, 
-          lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(),
-          timestamps: { ...prev.timestamps, financials: Date.now() }
-        };
+        const next = { ...prev, companies: merged, lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), timestamps: { ...prev.timestamps, financials: Date.now() } };
         localStorage.setItem(CACHE_KEY, JSON.stringify(next));
         return next;
       });
-    } catch (err) { setLoadingStatus('Erreur Sync'); }
+    } catch (err) { setLoadingStatus('Erreur'); }
     finally { setTimeout(() => setLoading(false), 500); }
   };
 

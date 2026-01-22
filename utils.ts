@@ -1,13 +1,12 @@
 
 /**
- * Utilitaires financiers centralisés pour le Terminal OOH
+ * Utilitaires financiers et techniques centralisés pour le Terminal OOH
  */
 
 export const parseFinancialValue = (val: any): number => {
   if (typeof val === 'number') return val;
   if (!val || typeof val !== 'string' || val === '--') return 0;
   
-  // Nettoyage radical des chaînes
   let clean = val.replace(/[^-0-9,.]/g, '').replace(',', '.');
   
   if (clean.length > 15 && !clean.includes('e')) {
@@ -46,16 +45,26 @@ export const formatMultiple = (val: number | undefined | null): string => {
 
 export const formatCurrencyShort = (val: number | string | undefined): string => {
   if (val === undefined || val === null || val === '--' || val === '') return '--';
-  
-  if (typeof val === 'string' && (val.includes('B') || val.includes('M')) && val.length < 10) {
-    return val;
-  }
-
   const num = typeof val === 'string' ? parseFinancialValue(val) : val;
   if (num === 0 || isNaN(num)) return '--';
-
-  if (Math.abs(num) >= 1000) {
-    return `${(num / 1000).toFixed(2)} B`;
-  }
+  if (Math.abs(num) >= 1000) return `${(num / 1000).toFixed(2)} B`;
   return `${num.toFixed(1)} M`;
 };
+
+/**
+ * Nettoie les réponses JSON de l'IA qui peuvent contenir du Markdown
+ */
+export function cleanJsonResponse(text: string | undefined): string {
+  if (!text) return "{}";
+  let cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  
+  // On prend le premier ouvrant JSON valide
+  let start = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
+  else start = firstBrace !== -1 ? firstBrace : firstBracket;
+
+  if (start === -1) return "{}";
+  return cleaned.substring(start);
+}
