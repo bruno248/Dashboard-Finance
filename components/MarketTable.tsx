@@ -5,13 +5,9 @@ import { Company, AnalystRating } from '../types';
 interface MarketTableProps {
   companies: Company[];
   onSelectCompany: (company: Company) => void;
-  currency: 'EUR' | 'USD';
 }
 
-const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany, currency }) => {
-  const FX_RATE = 1.08;
-  const convert = (val: number) => currency === 'USD' ? val * FX_RATE : val;
-
+const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany }) => {
   const getRatingColor = (rating: AnalystRating) => {
     switch (rating) {
       case AnalystRating.BUY: return 'text-emerald-400 bg-emerald-500/10';
@@ -29,8 +25,8 @@ const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany, c
           <thead className="bg-slate-800/50 border-b border-slate-700">
             <tr>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest">Valeur</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Dernier</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif de Cours</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Cours (LC)</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif (LC)</th>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-center">Var. %</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">Cap.</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">EV/EBITDA 25E</th>
@@ -52,10 +48,10 @@ const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany, c
                   </div>
                 </td>
                 <td className="px-4 md:px-6 py-4 font-bold text-slate-100 text-right text-xs md:text-sm whitespace-nowrap">
-                  {convert(company.price || 0).toFixed(2)}
+                  {(company.price || 0).toFixed(2)}
                 </td>
                 <td className="px-4 md:px-6 py-4 font-bold text-emerald-400 text-right text-xs md:text-sm whitespace-nowrap">
-                  {convert(company.targetPrice || 0).toFixed(2)}
+                  {(company.targetPrice || 0).toFixed(2)}
                 </td>
                 <td className={`px-4 md:px-6 py-4 font-black text-center text-xs md:text-sm ${(company.change || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {(company.change || 0) >= 0 ? '+' : ''}{(company.change || 0).toFixed(2)}%

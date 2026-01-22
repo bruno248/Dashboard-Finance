@@ -6,9 +6,10 @@ import { summarizeNewsItem } from '../services/newsService';
 interface NewsPageProps {
   news: NewsItem[];
   onRefreshNews?: () => void;
+  loading?: boolean;
 }
 
-const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
+const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews, loading }) => {
   const [filter, setFilter] = useState('All');
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -78,10 +79,11 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
           {onRefreshNews && (
             <button 
               onClick={onRefreshNews}
-              className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 transition-all border border-emerald-500/20 shadow-sm"
+              disabled={loading}
+              className={`p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl hover:bg-emerald-500/20 transition-all border border-emerald-500/20 shadow-sm ${loading ? 'animate-spin opacity-50' : ''}`}
               title="Actualiser les news"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
           )}
         </div>
@@ -146,11 +148,10 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
         )}
       </div>
 
-      {/* MODAL D'ACTION NEWS - CORRIGÉE POUR LE SCROLL */}
+      {/* MODAL D'ACTION NEWS */}
       {selectedNews && (
         <div className="fixed inset-0 z-[200] flex items-start md:items-center justify-center p-2 md:p-4 bg-slate-900/90 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
           <div className="bg-slate-800 w-full max-w-2xl rounded-3xl md:rounded-[2.5rem] border border-slate-700 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 my-auto">
-            {/* Header de la modal - Fixe */}
             <div className="p-6 md:p-10 border-b border-slate-700/50 flex justify-between items-start gap-4">
               <div className="space-y-2">
                 <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${getTagStyle(selectedNews.tag)}`}>
@@ -171,7 +172,6 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
               </button>
             </div>
 
-            {/* Corps de la modal - Scrollable si nécessaire */}
             <div className="p-6 md:p-10 space-y-6 max-h-[60vh] overflow-y-auto no-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <a 
@@ -218,7 +218,6 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
                   ) : (
                     <div className="text-slate-200 text-sm leading-relaxed prose prose-invert max-w-none">
                       <div className="whitespace-pre-line font-medium text-slate-100 border-b border-slate-700/50 pb-6 mb-6">
-                        {/* On sépare le texte s'il contient Key Takeaways pour un style différencié */}
                         {summary?.split(/KEY TAKEAWAYS/i)[0]}
                       </div>
                       {summary?.toLowerCase().includes('key takeaways') && (
@@ -240,7 +239,6 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, onRefreshNews }) => {
               )}
             </div>
             
-            {/* Footer de la modal pour forcer la fermeture si besoin */}
             <div className="p-6 bg-slate-900/30 border-t border-slate-700/50 flex justify-center">
                <button 
                  onClick={closeOverlay}

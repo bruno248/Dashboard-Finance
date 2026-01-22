@@ -6,9 +6,10 @@ interface DocumentsPageProps {
   docs: DocumentItem[]; 
   data?: SectorData;
   onRefreshDocs?: () => void;
+  loading?: boolean;
 }
 
-const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs }) => {
+const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs, loading }) => {
   const companies = useMemo(() => 
     data?.companies.map(c => c.ticker).filter(Boolean) as string[] || ['DEC.PA', 'LAMR', 'OUT', 'SAX.DE', 'CCO'], 
     [data?.companies]
@@ -73,10 +74,11 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
              {onRefreshDocs && (
                <button 
                  onClick={onRefreshDocs}
-                 className="p-3 bg-slate-900 text-emerald-400 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-all shadow-lg group"
+                 disabled={loading}
+                 className={`p-3 bg-slate-900 text-emerald-400 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-all shadow-lg group ${loading ? 'opacity-50' : ''}`}
                  title="Actualiser les documents"
                >
-                 <svg className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                 <svg className={`w-5 h-5 transition-transform duration-500 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                </button>
              )}
              <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 shadow-inner whitespace-nowrap">

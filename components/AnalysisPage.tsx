@@ -225,6 +225,11 @@ const AnalysisPage: React.FC<AnalysisPageProps> = ({ data }) => {
                 className="flex-1 flex flex-col items-center group relative h-full justify-end cursor-pointer"
                 onMouseEnter={() => setActiveBenchTicker(d.ticker)}
               >
+                {/* VALEUR AU-DESSUS DE CHAQUE COLONNE */}
+                <div className={`mb-2 text-[10px] font-black transition-all duration-300 ${isActive ? 'text-emerald-400 scale-110' : 'text-slate-500 opacity-60'}`}>
+                  {d.value.toFixed(1)}{benchMetric === 'yield' ? '%' : 'x'}
+                </div>
+                
                 <div 
                   className={`w-full rounded-t-2xl transition-all duration-500 relative ${
                     isActive 

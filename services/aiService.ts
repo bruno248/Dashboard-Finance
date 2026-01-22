@@ -11,7 +11,6 @@ const FALLBACK_COMPANIES = [
     ebit2024: "1150 M", ebit2025: "1240 M", ebit2026: "1350 M",
     netIncome2024: "385 M", netIncome2025: "430 M", netIncome2026: "495 M",
     capex2024: "260 M", capex2025: "275 M", capex2026: "290 M",
-    // Fixed duplicate property key from 'fcf2025' to 'fcf2026'
     fcf2024: "420 M", fcf2025: "480 M", fcf2026: "540 M"
   },
   { 
@@ -50,14 +49,48 @@ const FALLBACK_COMPANIES = [
 
 export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpdated: string; companies: any[] }> {
   return withRetry(async () => {
-    // Moved GoogleGenAI initialization inside the function to capture the latest API key from the environment/dialog
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const today = new Date().toISOString().split('T')[0];
-    const prompt = `Assistant financier OOH. Récupère sur Internet les données financières récentes pour : ${tickers.join(", ")}.
-    Format JSON strict. price/change sont des nombres. Les autres sont des chaînes. Utilise "N/A" si manquant.
+    
+    // Prompt renforcé pour éviter les réponses vides et forcer la recherche
+    const prompt = `Tu es un analyste financier expert spécialisé dans l'OOH. 
+    RECHERCHE IMPÉRATIVEMENT les données financières RÉELLES et RÉCENTES sur Internet (Yahoo Finance, Boursorama, Bloomberg) pour : ${tickers.join(", ")}.
+    
+    Règles strictes :
+    1. Ne JAMAIS inventer de chiffres. Si inconnu, mets "N/A".
+    2. Les champs 'price' et 'change' doivent être des nombres.
+    3. Les autres champs (marketCap, netDebt, ebitda, revenue...) doivent être des chaînes (ex: "4500 M").
+    4. Réponds EXCLUSIVEMENT avec le JSON structuré ci-dessous. Pas de texte avant ou après.
+    
+    Structure JSON attendue :
     {
       "lastUpdated": "${today}",
-      "companies": [{ "ticker": "string", "price": 0, "change": 0, "marketCap": "...", "netDebt": "...", ... }]
+      "companies": [
+        {
+          "ticker": "string",
+          "price": number,
+          "change": number,
+          "marketCap": "string",
+          "netDebt": "string",
+          "dividendYield": "string",
+          "dividendYield2025": "string",
+          "dividendYield2026": "string",
+          "revenue2024": "string",
+          "revenue2025": "string",
+          "revenue2026": "string",
+          "ebitda2024": "string",
+          "ebitda2025": "string",
+          "ebitda2026": "string",
+          "ebit2024": "string",
+          "ebit2025": "string",
+          "ebit2026": "string",
+          "netIncome2024": "string",
+          "netIncome2025": "string",
+          "netIncome2026": "string",
+          "capex2024": "string",
+          "fcf2024": "string"
+        }
+      ]
     }`;
 
     const response = await ai.models.generateContent({
@@ -69,13 +102,26 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Réponse vide");
+    // Extraction robuste du texte
+    let text = response.text;
+    
+    // Fallback si response.text est vide (peut arriver avec l'outil de grounding si le modèle renvoie uniquement des parts non-textuelles)
+    if (!text && response.candidates?.[0]?.content?.parts) {
+      text = response.candidates[0].content.parts
+        .map(part => part.text || "")
+        .join("")
+        .trim();
+    }
+
+    if (!text) {
+      throw new Error("L'IA a renvoyé une réponse vide malgré la recherche.");
+    }
 
     const rawData = JSON.parse(cleanJsonResponse(text));
+    
     return {
       lastUpdated: rawData.lastUpdated || today,
-      companies: rawData.companies || FALLBACK_COMPANIES
+      companies: rawData.companies && rawData.companies.length > 0 ? rawData.companies : FALLBACK_COMPANIES
     };
   }).catch(e => {
     console.error("fetchRealTimeOOHData permanent error:", e);
@@ -88,7 +134,6 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
 
 export async function queryCompanyAI(prompt: string, context: SectorData): Promise<string> {
   return withRetry(async () => {
-    // Moved GoogleGenAI initialization inside the function to capture the latest API key from the environment/dialog
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const simplifiedContext = context.companies.map(c => ({ 
       t: c.ticker, r25: c.revenue2025, eb25: c.ebitda2025, ebit25: c.ebit2025, per25: c.perForward 
@@ -96,8 +141,12 @@ export async function queryCompanyAI(prompt: string, context: SectorData): Promi
     
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Expert Analyst OOH. Context: ${JSON.stringify(simplifiedContext)}. Question: ${prompt}. Answer in French.`,
+      contents: `Tu es un Analyste OOH Senior. Analyse les données suivantes pour répondre : ${JSON.stringify(simplifiedContext)}. 
+      Question de l'utilisateur : ${prompt}. 
+      Réponds en français avec précision et professionnalisme.`,
     });
-    return response.text || "Analyse indisponible.";
-  }).catch(() => "L'IA est actuellement saturée. Réessayez plus tard.");
+
+    const text = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || "";
+    return text || "Analyse indisponible pour le moment.";
+  }).catch(() => "L'IA est actuellement saturée ou la réponse est vide. Réessayez plus tard.");
 }

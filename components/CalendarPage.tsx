@@ -4,11 +4,13 @@ import { EventItem } from '../types';
 
 interface CalendarPageProps {
   events: EventItem[];
+  onRefreshAgenda?: () => void;
+  loading?: boolean;
 }
 
 const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ events }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ events, onRefreshAgenda, loading }) => {
   const [currentDate, setCurrentDate] = useState(new Date()); 
   const [view, setView] = useState<'grid' | 'list'>(window.innerWidth < 768 ? 'list' : 'grid');
   
@@ -69,9 +71,22 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events }) => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
-          <div className="flex bg-slate-900 p-1 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner">
-            <button onClick={() => setView('grid')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'grid' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>GRILLE</button>
-            <button onClick={() => setView('list')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'list' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>LISTE</button>
+
+          <div className="flex items-center gap-4">
+            {onRefreshAgenda && (
+              <button 
+                onClick={onRefreshAgenda}
+                disabled={loading}
+                className={`p-3 bg-slate-900 text-emerald-400 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-all shadow-lg ${loading ? 'opacity-50' : ''}`}
+                title="Actualiser l'agenda"
+              >
+                <svg className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </button>
+            )}
+            <div className="flex bg-slate-900 p-1 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner">
+              <button onClick={() => setView('grid')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'grid' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>GRILLE</button>
+              <button onClick={() => setView('list')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'list' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>LISTE</button>
+            </div>
           </div>
         </div>
 
@@ -109,7 +124,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events }) => {
 
                   return (
                     <div key={idx} className="flex items-center gap-4 md:gap-6 p-4 md:p-6 bg-slate-900/50 rounded-2xl md:rounded-3xl border border-slate-700 hover:border-emerald-500/30 transition-all group shadow-xl">
-                      {/* Carré de date style Calendrier */}
                       <div className={`flex flex-col w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl border overflow-hidden shadow-lg flex-shrink-0 transition-transform group-hover:scale-105 ${imminent ? 'border-emerald-500' : 'border-slate-700'}`}>
                         <div className={`h-1/3 w-full flex items-center justify-center text-[7px] md:text-[10px] font-black tracking-widest ${imminent ? 'bg-emerald-500 text-slate-900' : 'bg-slate-700 text-slate-400'}`}>
                           {month}

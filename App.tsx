@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardOverview from './components/DashboardOverview';
@@ -13,47 +13,65 @@ import ScreenerPage from './components/ScreenerPage';
 import { Company, SectorData } from './types';
 import { COMPANIES, NEWS, EVENTS, DOCUMENTS } from './constants';
 import { fetchRealTimeOOHData } from './services/aiService';
+import { fetchOOHNews } from './services/newsService';
+import { fetchOOHDocuments } from './services/documentService';
+import { fetchOOHAgenda } from './services/agendaService';
 import { parseFinancialValue, calculateEV, parsePercent } from './utils';
 
 const CACHE_KEY = 'ooh_insight_v28_persistence';
 const FINANCIALS_TTL = 30 * 60 * 1000;
+const NEWS_TTL = 15 * 60 * 1000;
+const DOCS_TTL = 120 * 60 * 1000;
+const CALENDAR_TTL = 240 * 60 * 1000;
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'news' | 'analysis' | 'docs' | 'calendar' | 'sources' | 'screener'>('overview');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
+  
+  // États de chargement indépendants
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  
   const [loadingStatus, setLoadingStatus] = useState('');
-  const [currency, setCurrency] = useState<'EUR' | 'USD'>('EUR');
   
   const [data, setData] = useState<SectorData & { timestamps: Record<string, number> }>(() => {
     const saved = localStorage.getItem(CACHE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...parsed, companies: parsed.companies?.length > 0 ? parsed.companies : COMPANIES, timestamps: parsed.timestamps || {} };
+        return { 
+          ...parsed, 
+          companies: parsed.companies?.length > 0 ? parsed.companies : COMPANIES, 
+          timestamps: parsed.timestamps || {} 
+        };
       } catch (e) { console.error(e); }
     }
     return { companies: COMPANIES, news: NEWS, events: EVENTS, documents: DOCUMENTS, companyDocuments: {}, analysis: "", marketOpportunities: [], marketRisks: [], lastUpdated: 'Initialisation...', timestamps: {} };
   });
 
+  // Persistance automatique
+  useEffect(() => {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  }, [data]);
+
+  // Chargement initial intelligent
   useEffect(() => {
     const now = Date.now();
-    if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) refreshData();
+    if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) refreshFinancials();
+    if (now - (data.timestamps?.news || 0) > NEWS_TTL) refreshNews();
+    if (now - (data.timestamps?.docs || 0) > DOCS_TTL) refreshDocs();
+    if (now - (data.timestamps?.calendar || 0) > CALENDAR_TTL) refreshCalendar();
   }, []);
 
-  const refreshData = async (targetTickers?: string[]) => {
-    setLoading(true);
-    setLoadingStatus('Synchronisation financière...');
+  const refreshFinancials = async (targetTickers?: string[]) => {
+    setFinancialLoading(true);
+    setLoadingStatus('Données financières...');
     try {
       const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
       const syncResult = await fetchRealTimeOOHData(tickers);
       
-      if (syncResult.lastUpdated.includes('secours') || syncResult.lastUpdated.includes('Fallback')) {
-        setLoadingStatus('Quota épuisé - Mode secours');
-      } else {
-        setLoadingStatus('');
-      }
-
       setData(prev => {
         const merged = prev.companies.map(base => {
           const u = syncResult.companies.find((x: any) => x.ticker.toUpperCase() === base.ticker?.toUpperCase());
@@ -82,30 +100,102 @@ const App: React.FC = () => {
           };
         });
 
-        const next = { ...prev, companies: merged, lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), timestamps: { ...prev.timestamps, financials: Date.now() } };
-        localStorage.setItem(CACHE_KEY, JSON.stringify(next));
-        return next;
+        return { 
+          ...prev, 
+          companies: merged, 
+          lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), 
+          timestamps: { ...prev.timestamps, financials: Date.now() } 
+        };
       });
-    } catch (err: any) { 
-      console.error(err);
-      setLoadingStatus('Erreur de quota - Modifiez votre clé'); 
-    }
-    finally { setTimeout(() => setLoading(false), 500); }
+    } catch (err) { console.error(err); }
+    finally { setFinancialLoading(false); setLoadingStatus(''); }
   };
 
-  const renderContent = () => {
-    if (selectedCompany) return <CompanyDetail company={selectedCompany as Company} onSelectCompany={setSelectedCompany} currency={currency} />;
+  const refreshNews = async () => {
+    setNewsLoading(true);
+    setLoadingStatus('Actualités...');
+    try {
+      const news = await fetchOOHNews();
+      setData(prev => ({ 
+        ...prev, 
+        news, 
+        timestamps: { ...prev.timestamps, news: Date.now() } 
+      }));
+    } catch (err) { console.error(err); }
+    finally { setNewsLoading(false); setLoadingStatus(''); }
+  };
+
+  const refreshDocs = async () => {
+    setDocsLoading(true);
+    setLoadingStatus('Documents...');
+    try {
+      const docsMap = await fetchOOHDocuments();
+      setData(prev => ({ 
+        ...prev, 
+        // Fusionner avec les documents existants pour ne rien perdre (persistance des liens téléchargés)
+        companyDocuments: { ...prev.companyDocuments, ...docsMap }, 
+        timestamps: { ...prev.timestamps, docs: Date.now() } 
+      }));
+    } catch (err) { console.error(err); }
+    finally { setDocsLoading(false); setLoadingStatus(''); }
+  };
+
+  const refreshCalendar = async () => {
+    setCalendarLoading(true);
+    setLoadingStatus('Agenda...');
+    try {
+      const events = await fetchOOHAgenda();
+      setData(prev => ({ 
+        ...prev, 
+        events, 
+        timestamps: { ...prev.timestamps, calendar: Date.now() } 
+      }));
+    } catch (err) { console.error(err); }
+    finally { setCalendarLoading(false); setLoadingStatus(''); }
+  };
+
+  const handleGlobalRefresh = useCallback(() => {
+    // Si on est sur une vue d'entreprise, on rafraîchit ses chiffres
+    if (selectedCompany) {
+      refreshFinancials([selectedCompany.ticker]);
+      return;
+    }
+    
+    // Sinon, rafraîchissement contextuel selon l'onglet
     switch (activeTab) {
-      case 'overview': return <DashboardOverview data={data} onSelectCompany={setSelectedCompany as any} currency={currency} />;
-      case 'news': return <NewsPage news={data.news} />;
+      case 'overview':
+      case 'analysis':
+      case 'screener':
+      case 'sources':
+        refreshFinancials();
+        break;
+      case 'news':
+        refreshNews();
+        break;
+      case 'docs':
+        refreshDocs();
+        break;
+      case 'calendar':
+        refreshCalendar();
+        break;
+    }
+  }, [activeTab, selectedCompany]);
+
+  const renderContent = () => {
+    if (selectedCompany) return <CompanyDetail company={selectedCompany as Company} onSelectCompany={setSelectedCompany} />;
+    switch (activeTab) {
+      case 'overview': return <DashboardOverview data={data} onSelectCompany={setSelectedCompany as any} />;
+      case 'news': return <NewsPage news={data.news} onRefreshNews={refreshNews} loading={newsLoading} />;
       case 'analysis': return <AnalysisPage data={data} />;
-      case 'docs': return <DocumentsPage docs={data.documents} data={data} />;
-      case 'calendar': return <CalendarPage events={data.events} />;
-      case 'sources': return <SourcesPage data={data} onAddTicker={(t) => refreshData([...data.companies.map(c => c.ticker), t] as string[])} />;
+      case 'docs': return <DocumentsPage docs={data.documents} data={data} onRefreshDocs={refreshDocs} loading={docsLoading} />;
+      case 'calendar': return <CalendarPage events={data.events} onRefreshAgenda={refreshCalendar} loading={calendarLoading} />;
+      case 'sources': return <SourcesPage data={data} onAddTicker={(t) => refreshFinancials([...data.companies.map(c => c.ticker), t] as string[])} />;
       case 'screener': return <ScreenerPage data={data} onSelectCompany={setSelectedCompany as any} />;
-      default: return <DashboardOverview data={data} onSelectCompany={setSelectedCompany as any} currency={currency} />;
+      default: return <DashboardOverview data={data} onSelectCompany={setSelectedCompany as any} />;
     }
   };
+
+  const isCurrentViewLoading = financialLoading || newsLoading || docsLoading || calendarLoading;
 
   return (
     <div className="flex min-h-screen bg-slate-900 text-slate-50 overflow-x-hidden">
@@ -113,14 +203,14 @@ const App: React.FC = () => {
       <main className="flex-1 md:ml-60 flex flex-col p-4 md:p-8 relative">
         <Header 
           title={selectedCompany ? selectedCompany.name : "OOH Terminal"} 
-          subtitle={loadingStatus || `Maj : ${data.lastUpdated}`} 
+          subtitle={loadingStatus || `Dernière synchro : ${data.lastUpdated}`} 
           onBack={selectedCompany ? () => setSelectedCompany(null) : undefined} 
-          onRefresh={() => refreshData()} 
-          loading={loading} 
-          currency={currency} 
-          setCurrency={setCurrency} 
+          onRefresh={handleGlobalRefresh} 
+          loading={isCurrentViewLoading} 
         />
-        <div className={loading ? 'opacity-50 blur-[1px]' : ''}>{renderContent()}</div>
+        <div className={isCurrentViewLoading ? 'opacity-50 blur-[1px] transition-all duration-300' : 'transition-all duration-300'}>
+          {renderContent()}
+        </div>
       </main>
     </div>
   );

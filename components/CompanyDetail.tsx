@@ -8,13 +8,10 @@ import { formatCurrencyShort, formatMultiple } from '../utils';
 interface CompanyDetailProps {
   company: Company;
   onSelectCompany: (company: Company) => void;
-  currency: 'EUR' | 'USD';
 }
 
-const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany, currency }) => {
+const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany }) => {
   const [range, setRange] = useState<'1M' | '6M' | '1A'>('1A');
-  const FX_RATE = 1.08;
-  const convert = (val: number) => currency === 'USD' ? val * FX_RATE : val;
 
   const simulatedHistory = useMemo(() => {
     const points = range === '1M' ? 30 : range === '6M' ? 60 : 120;
@@ -60,7 +57,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany,
             <div className="flex flex-col md:items-end">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dernier Cours</span>
               <div className="text-4xl md:text-7xl font-black text-white tracking-tighter tabular-nums">
-                {convert(company.price).toFixed(2)}<span className="text-lg md:text-2xl text-slate-600 ml-2 font-black">{currency}</span>
+                {(company.price).toFixed(2)}<span className="text-lg md:text-2xl text-slate-600 ml-2 font-black">EUR</span>
               </div>
             </div>
             <div className={`mt-2 px-4 py-2 rounded-2xl text-lg md:text-2xl font-black flex items-center gap-2 ${company.change >= 0 ? 'text-emerald-400 bg-emerald-500/5' : 'text-rose-400 bg-rose-500/5'}`}>

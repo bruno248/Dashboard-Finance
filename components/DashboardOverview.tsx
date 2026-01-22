@@ -7,10 +7,9 @@ import { parseFinancialValue } from '../utils';
 interface DashboardOverviewProps {
   data: SectorData;
   onSelectCompany: (company: Company) => void;
-  currency: 'EUR' | 'USD';
 }
 
-const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCompany, currency }) => {
+const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCompany }) => {
   const [yearView, setYearView] = useState<'2025' | '2026'>('2025');
   const companies = (data.companies as Company[]) || [];
   
@@ -103,7 +102,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
         <div className="flex items-center justify-between mb-4 px-1">
           <h2 className="text-lg md:text-xl font-bold text-white">Cotes Sectorielles</h2>
         </div>
-        <MarketTable companies={companies} onSelectCompany={onSelectCompany} currency={currency} />
+        <MarketTable companies={companies} onSelectCompany={onSelectCompany} />
       </section>
 
       {/* Flux d'actualités complet en bas */}
