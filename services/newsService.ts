@@ -1,9 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { NewsItem } from "../types";
-import { cleanJsonResponse } from "../utils";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { cleanJsonResponse, withRetry } from "../utils";
 
 const FALLBACK_NEWS: NewsItem[] = [
   { id: 101, source: "Reuters", tag: "Digital", title: "JCDecaux accélère son déploiement programmatique en Europe du Nord", time: "2h ago" },
@@ -11,7 +9,8 @@ const FALLBACK_NEWS: NewsItem[] = [
 ];
 
 export const fetchOOHNews = async (): Promise<NewsItem[]> => {
-  try {
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: "Récupère 5 news OOH récentes (JCDecaux, Lamar, Ströer) en JSON format: { \"news\": [...] }",
@@ -19,19 +18,16 @@ export const fetchOOHNews = async (): Promise<NewsItem[]> => {
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     return parsed.news || FALLBACK_NEWS;
-  } catch (error) {
-    return FALLBACK_NEWS;
-  }
+  }).catch(() => FALLBACK_NEWS);
 };
 
 export const summarizeNewsItem = async (title: string, source: string): Promise<string> => {
-  try {
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyse cette news OOH : "${title}" (${source}). Résumé court + 3 points clés en français.`,
     });
     return response.text || "Résumé indisponible.";
-  } catch (error) {
-    return "Résumé indisponible.";
-  }
+  }).catch(() => "Le service de résumé est temporairement indisponible.");
 };

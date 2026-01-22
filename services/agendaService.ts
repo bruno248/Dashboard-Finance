@@ -3,8 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { EventItem } from "../types";
 import { cleanJsonResponse } from "../utils";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const FALLBACK_AGENDA: EventItem[] = [
   { id: "e1", title: "JCDecaux Full Year 2024 Results", date: "2025-03-06", type: "Earnings" },
   { id: "e2", title: "Lamar Advertising Q4 & FY 2024 Results", date: "2025-02-21", type: "Earnings" },
@@ -16,6 +14,8 @@ const FALLBACK_AGENDA: EventItem[] = [
 
 export const fetchOOHAgenda = async (): Promise<EventItem[]> => {
   try {
+    // Move initialization inside the function call to ensure the latest API key is used
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: "Prochaines dates earnings OOH 2025 en JSON. Format: { \"events\": [ { \"id\": \"string\", \"title\": \"string\", \"date\": \"YYYY-MM-DD\", \"type\": \"string\" } ] }",

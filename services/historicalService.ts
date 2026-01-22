@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { HistoricalPricesPayload, PriceSeries, PricePoint } from "../types";
 import { cleanJsonResponse } from "../utils";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const STORAGE_KEY = 'ooh_terminal_history_master_v1';
 
 const getStoredHistory = (): Record<string, PricePoint[]> => {
@@ -29,6 +28,8 @@ export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", t
   if (tickersToFetch.length === 0) return { period, series };
 
   try {
+    // Move initialization inside the function call to ensure the latest API key is used
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Historical stock prices for: ${tickersToFetch.join(", ")}. Period: ${period}. JSON format.`,

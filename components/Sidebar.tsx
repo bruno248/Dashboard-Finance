@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface SidebarProps {
   activeTab: string;
@@ -7,6 +7,28 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+  const [hasCustomKey, setHasCustomKey] = useState(false);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio?.hasSelectedApiKey) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setHasCustomKey(hasKey);
+      }
+    };
+    checkKey();
+    const interval = setInterval(checkKey, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleKeySelection = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      // On assume le succès selon les guidelines
+      setHasCustomKey(true);
+    }
+  };
+
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
@@ -56,9 +78,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             ))}
           </ul>
         </nav>
+        
+        <div className="px-3 mb-4">
+          <button 
+            onClick={handleKeySelection}
+            className={`w-full p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 ${
+              hasCustomKey 
+                ? 'bg-emerald-500/5 border-emerald-500/30 hover:bg-emerald-500/10' 
+                : 'bg-amber-500/5 border-amber-500/30 hover:bg-amber-500/10 animate-pulse'
+            }`}
+          >
+            <div className="text-[8px] uppercase tracking-widest font-black text-slate-500">API Key Storage</div>
+            <div className="flex items-center gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full ${hasCustomKey ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+              <span className="text-[10px] font-bold text-slate-200">
+                {hasCustomKey ? 'Clé Perso Active' : 'Utiliser ma clé'}
+              </span>
+            </div>
+          </button>
+        </div>
+
         <div className="p-4 mx-3 mb-6 bg-slate-900/50 rounded-2xl border border-slate-700/50">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-black mb-1">Live Feed</div>
-          <div className="text-xs font-bold flex items-center gap-2">Gemini 3 Pro <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span></div>
+          <div className="text-xs font-bold flex items-center gap-2">Gemini 3 Flash <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span></div>
         </div>
       </aside>
 

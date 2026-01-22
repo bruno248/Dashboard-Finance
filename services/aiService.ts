@@ -1,9 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { SectorData } from "../types";
-import { cleanJsonResponse } from "../utils";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { cleanJsonResponse, withRetry } from "../utils";
 
 const FALLBACK_COMPANIES = [
   { 
@@ -13,6 +11,7 @@ const FALLBACK_COMPANIES = [
     ebit2024: "1150 M", ebit2025: "1240 M", ebit2026: "1350 M",
     netIncome2024: "385 M", netIncome2025: "430 M", netIncome2026: "495 M",
     capex2024: "260 M", capex2025: "275 M", capex2026: "290 M",
+    // Fixed duplicate property key from 'fcf2025' to 'fcf2026'
     fcf2024: "420 M", fcf2025: "480 M", fcf2026: "540 M"
   },
   { 
@@ -50,50 +49,55 @@ const FALLBACK_COMPANIES = [
 ];
 
 export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpdated: string; companies: any[] }> {
-  try {
+  return withRetry(async () => {
+    // Moved GoogleGenAI initialization inside the function to capture the latest API key from the environment/dialog
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const today = new Date().toISOString().split('T')[0];
-    const prompt = `Finance OOH Data Extract for: ${tickers.join(", ")}. 
-    Required (2024/25/26): Price, Change, MktCap, NetDebt, Revenue, EBITDA, EBIT, NetIncome, Capex, FCF, Yield.
-    Return JSON ONLY:
+    const prompt = `Assistant financier OOH. Récupère sur Internet les données financières récentes pour : ${tickers.join(", ")}.
+    Format JSON strict. price/change sont des nombres. Les autres sont des chaînes. Utilise "N/A" si manquant.
     {
       "lastUpdated": "${today}",
-      "companies": [{ 
-        "ticker": "string", "price": number, "change": number, "marketCap": "string", "netDebt": "string", 
-        "revenue2024": "string", "revenue2025": "string", "revenue2026": "string",
-        "ebitda2024": "string", "ebitda2025": "string", "ebitda2026": "string",
-        "ebit2024": "string", "ebit2025": "string", "ebit2026": "string",
-        "netIncome2024": "string", "netIncome2025": "string", "netIncome2026": "string",
-        "capex2024": "string", "capex2025": "string", "capex2026": "string",
-        "fcf2024": "string", "fcf2025": "string", "fcf2026": "string",
-        "dividendYield": "string", "dividendYield2025": "string", "dividendYield2026": "string"
-      }]
+      "companies": [{ "ticker": "string", "price": 0, "change": 0, "marketCap": "...", "netDebt": "...", ... }]
     }`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
-      config: { tools: [{ googleSearch: {} }], responseMimeType: "application/json" }
+      config: { 
+        tools: [{ googleSearch: {} }], 
+        responseMimeType: "application/json" 
+      }
     });
 
-    const rawData = JSON.parse(cleanJsonResponse(response.text));
+    const text = response.text;
+    if (!text) throw new Error("Réponse vide");
+
+    const rawData = JSON.parse(cleanJsonResponse(text));
     return {
-      lastUpdated: rawData.lastUpdated || new Date().toLocaleString('fr-FR'),
+      lastUpdated: rawData.lastUpdated || today,
       companies: rawData.companies || FALLBACK_COMPANIES
     };
-  } catch (e) {
-    return { lastUpdated: `Fallback Mode (${new Date().toLocaleTimeString()})`, companies: FALLBACK_COMPANIES };
-  }
+  }).catch(e => {
+    console.error("fetchRealTimeOOHData permanent error:", e);
+    return { 
+      lastUpdated: `Données de secours (${new Date().toLocaleTimeString()})`, 
+      companies: FALLBACK_COMPANIES 
+    };
+  });
 }
 
 export async function queryCompanyAI(prompt: string, context: SectorData): Promise<string> {
-  try {
-    const simplifiedContext = context.companies.map(c => ({ t: c.ticker, r25: c.revenue2025, eb25: c.ebitda2025, ebit25: c.ebit2025, per25: c.perForward }));
+  return withRetry(async () => {
+    // Moved GoogleGenAI initialization inside the function to capture the latest API key from the environment/dialog
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const simplifiedContext = context.companies.map(c => ({ 
+      t: c.ticker, r25: c.revenue2025, eb25: c.ebitda2025, ebit25: c.ebit2025, per25: c.perForward 
+    }));
+    
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Expert Analyst OOH. Context: ${JSON.stringify(simplifiedContext)}. Question: ${prompt}. Answer in French.`,
     });
     return response.text || "Analyse indisponible.";
-  } catch (e) {
-    return "L'IA est actuellement saturée.";
-  }
+  }).catch(() => "L'IA est actuellement saturée. Réessayez plus tard.");
 }

@@ -48,6 +48,12 @@ const App: React.FC = () => {
       const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
       const syncResult = await fetchRealTimeOOHData(tickers);
       
+      if (syncResult.lastUpdated.includes('secours') || syncResult.lastUpdated.includes('Fallback')) {
+        setLoadingStatus('Quota épuisé - Mode secours');
+      } else {
+        setLoadingStatus('');
+      }
+
       setData(prev => {
         const merged = prev.companies.map(base => {
           const u = syncResult.companies.find((x: any) => x.ticker.toUpperCase() === base.ticker?.toUpperCase());
@@ -80,7 +86,10 @@ const App: React.FC = () => {
         localStorage.setItem(CACHE_KEY, JSON.stringify(next));
         return next;
       });
-    } catch (err) { setLoadingStatus('Erreur'); }
+    } catch (err: any) { 
+      console.error(err);
+      setLoadingStatus('Erreur de quota - Modifiez votre clé'); 
+    }
     finally { setTimeout(() => setLoading(false), 500); }
   };
 
@@ -102,7 +111,15 @@ const App: React.FC = () => {
     <div className="flex min-h-screen bg-slate-900 text-slate-50 overflow-x-hidden">
       <Sidebar activeTab={selectedCompany ? '' : activeTab} setActiveTab={(tab) => { setActiveTab(tab as any); setSelectedCompany(null); }} />
       <main className="flex-1 md:ml-60 flex flex-col p-4 md:p-8 relative">
-        <Header title={selectedCompany ? selectedCompany.name : "OOH Terminal"} subtitle={loadingStatus || `Maj : ${data.lastUpdated}`} onBack={selectedCompany ? () => setSelectedCompany(null) : undefined} onRefresh={() => refreshData()} loading={loading} currency={currency} setCurrency={setCurrency} />
+        <Header 
+          title={selectedCompany ? selectedCompany.name : "OOH Terminal"} 
+          subtitle={loadingStatus || `Maj : ${data.lastUpdated}`} 
+          onBack={selectedCompany ? () => setSelectedCompany(null) : undefined} 
+          onRefresh={() => refreshData()} 
+          loading={loading} 
+          currency={currency} 
+          setCurrency={setCurrency} 
+        />
         <div className={loading ? 'opacity-50 blur-[1px]' : ''}>{renderContent()}</div>
       </main>
     </div>

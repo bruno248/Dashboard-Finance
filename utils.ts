@@ -60,11 +60,27 @@ export function cleanJsonResponse(text: string | undefined): string {
   const firstBrace = cleaned.indexOf('{');
   const firstBracket = cleaned.indexOf('[');
   
-  // On prend le premier ouvrant JSON valide
   let start = -1;
   if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
   else start = firstBrace !== -1 ? firstBrace : firstBracket;
 
   if (start === -1) return "{}";
   return cleaned.substring(start);
+}
+
+/**
+ * Gère les retries avec backoff exponentiel pour les erreurs 429
+ */
+export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
+    if (retries > 0 && isRateLimit) {
+      console.warn(`Quota atteint. Nouvel essai dans ${delay}ms... (${retries} restants)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
 }
