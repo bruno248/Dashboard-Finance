@@ -1,4 +1,3 @@
-
 /**
  * Utilitaires financiers et techniques centralisés pour le Terminal OOH
  */
@@ -69,15 +68,18 @@ export function cleanJsonResponse(text: string | undefined): string {
 }
 
 /**
- * Gère les retries avec backoff exponentiel pour les erreurs 429
+ * Gère les retries avec backoff exponentiel pour les erreurs 429 et 503
  */
 export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
-    const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
-    if (retries > 0 && isRateLimit) {
-      console.warn(`Quota atteint. Nouvel essai dans ${delay}ms... (${retries} restants)`);
+    const isRetryable = 
+      (error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota')) || // Rate limit
+      (error?.status === 503 || error?.message?.includes('503') || error?.message?.toLowerCase().includes('overloaded')); // Service unavailable
+
+    if (retries > 0 && isRetryable) {
+      console.warn(`API temporairement indisponible (status: ${error.status || 'N/A'}). Nouvel essai dans ${delay}ms... (${retries} restants)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(fn, retries - 1, delay * 2);
     }
