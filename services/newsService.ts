@@ -143,14 +143,16 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
       }
     },
     required: ["label", "description", "keyTakeaways"],
+    propertyOrdering: ["label", "description", "keyTakeaways"],
   };
 
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `En tant qu'analyste financier, analyse ces titres d'actualités du secteur OOH:\n${newsTitles}\n\nQuel est le sentiment de marché global qui s'en dégage ? Fournis aussi 2-3 points clés à retenir. Réponds en français.`,
+      contents: `En tant qu'analyste financier, analyse ces titres d'actualités du secteur OOH:\n${newsTitles}\n\nQuel est le sentiment de marché global qui s'en dégage ? Fournis aussi 2-3 points clés à retenir. Réponds en français. La réponse DOIT être un JSON valide respectant strictement le schéma, utilisant des guillemets doubles pour les clés et les chaînes.`,
       config: {
+        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: sentimentSchema,
         temperature: 0.2,
@@ -159,9 +161,12 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     return parsed || { ...fallback, label: "Analyse Indisponible" };
-  }).catch(() => ({
-    ...fallback,
-    label: "Analyse Indisponible",
-    description: "Le service d'analyse est momentanément indisponible."
-  }));
+  }).catch((error) => {
+    console.error("fetchOOHSentimentFromNews failed:", error);
+    return {
+      ...fallback,
+      label: "Analyse Indisponible",
+      description: "Le service d'analyse est momentanément indisponible."
+    };
+  });
 };
