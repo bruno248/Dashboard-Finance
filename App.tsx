@@ -276,7 +276,6 @@ const App: React.FC = () => {
     }
     const delayedFetches = setTimeout(() => {
       if (now - (data.timestamps?.news || 0) > NEWS_TTL) refreshNews();
-      if (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL) refreshHighlights();
     }, 2500);
     return () => clearTimeout(delayedFetches);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -286,9 +285,10 @@ const App: React.FC = () => {
     setSelectedCompany(null);
     setActiveTab(tab);
     const now = Date.now();
+    if (tab === 'news' && (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL)) refreshHighlights();
     if (tab === 'docs' && (now - (data.timestamps?.docs || 0) > DOCS_TTL)) refreshDocs();
     if (tab === 'calendar' && (now - (data.timestamps?.calendar || 0) > CALENDAR_TTL)) refreshCalendar();
-  }, [data.timestamps, refreshDocs, refreshCalendar]);
+  }, [data.timestamps, refreshDocs, refreshCalendar, refreshHighlights]);
 
   const handleGlobalRefresh = useCallback(() => {
     if (selectedCompany) {

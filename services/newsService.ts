@@ -7,10 +7,7 @@ const today = new Date().toISOString().split('T')[0];
 
 const FALLBACK_NEWS: NewsItem[] = [];
 
-const FALLBACK_HIGHLIGHTS: NewsItem[] = [
-  { id: 201, source: "AdWeek", tag: "Deals", title: "Major Retailer Signs Exclusive DOOH Advertising Deal with Outfront Media", date: "2023-11-15", time: "10m ago"},
-  { id: 202, source: "WSJ", tag: "Market", title: "OOH Advertising Bounces Back Strongly in Post-Pandemic Travel Surge", date: "2023-09-01", time: "1y ago" }
-];
+const FALLBACK_HIGHLIGHTS: NewsItem[] = [];
 
 const simplifiedTagsDescription = "One of: Market, Corporate, Earnings, Deals, Digital, Regulation";
 
@@ -53,7 +50,7 @@ export const fetchOOHNews = async (maxCount: number = 5): Promise<NewsItem[]> =>
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview", // Changed to Flash for stability
       contents: `
 Récupère jusqu'à ${maxCount} actualités publiées dans les 3 DERNIERS JOURS 
 sur le secteur de la communication extérieure (OOH), notamment sur JCDecaux, Lamar, Ströer, Clear Channel, Outfront.
@@ -61,8 +58,7 @@ sur le secteur de la communication extérieure (OOH), notamment sur JCDecaux, La
 Contraintes fortes :
 - La date DOIT être renvoyée au format "YYYY-MM-DD" et être identifiable.
 - Pour chaque news, choisis un tag parmi : ${simplifiedTagsDescription}.
-
-Le résultat doit respecter strictement le schema JSON fourni.`,
+- Le résultat doit respecter strictement le schema JSON fourni. Les champs optionnels comme 'url' ou 'time' peuvent être omis si non pertinents.`,
       config: { 
         tools: [{ googleSearch: {} }], 
         responseMimeType: "application/json",
@@ -74,8 +70,8 @@ Le résultat doit respecter strictement le schema JSON fourni.`,
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     return parsed.news || FALLBACK_NEWS;
-  }).catch(() => {
-    // Si l'IA échoue, on ne montre simplement pas de news plutôt que des articles inventés.
+  }).catch((error) => {
+    console.error("fetchOOHNews failed:", error);
     return FALLBACK_NEWS;
   });
 };
@@ -84,17 +80,17 @@ export const fetchOOHHighlights = async (): Promise<NewsItem[]> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview", // Changed to Flash for stability
       contents: `
-Récupère 15 à 20 actualités MARQUANTES publiées au cours des 12 DERNIERS MOIS 
+Récupère 10 à 15 actualités MARQUANTES publiées au cours des 12 DERNIERS MOIS 
 sur le secteur de la communication extérieure (OOH).
 
 Contraintes fortes :
 - Ne sélectionne que des événements significatifs (M&A majeur, résultats annuels, changement de direction, innovation technologique importante).
-- La date DOIT être renvoyée au format "YYYY-MM-DD" et être identifiable.
+- La date DOIT être renvoyée au format "YYYY-MM-DD".
+- Le champ 'time' (temps relatif) est optionnel ; utiliser une chaîne vide si non applicable.
 - Pour chaque news, choisis un tag parmi : ${simplifiedTagsDescription}.
-
-Le résultat doit respecter strictement le schema JSON fourni.`,
+- La réponse DOIT être un JSON valide respectant strictement le schéma fourni.`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -106,7 +102,10 @@ Le résultat doit respecter strictement le schema JSON fourni.`,
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     return parsed.highlights || FALLBACK_HIGHLIGHTS;
-  }).catch(() => FALLBACK_HIGHLIGHTS);
+  }).catch((error) => {
+    console.error("fetchOOHHighlights failed:", error);
+    return FALLBACK_HIGHLIGHTS;
+  });
 };
 
 export const summarizeNewsItem = async (title: string, source: string): Promise<string> => {

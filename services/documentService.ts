@@ -3,9 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DocumentItem } from "../types";
 import { cleanJsonResponse } from "../utils";
 
-const FALLBACK_DOCS: DocumentFetchResult = {
-  "DEC.PA": [{ id: "d1", type: "Report", title: "Rapport Annuel 2023", date: "2024-03-15", url: "https://www.jcdecaux.com" }]
-};
+const FALLBACK_DOCS: DocumentFetchResult = {};
 
 export interface DocumentFetchResult { [ticker: string]: DocumentItem[]; }
 
