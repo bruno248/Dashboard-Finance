@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { HistoricalPricesPayload, PriceSeries, PricePoint } from "../types";
 import { cleanJsonResponse, withRetry } from "../utils";
+import { COMPANIES } from '../constants';
 
 const STORAGE_KEY = 'ooh_terminal_history_master_v1';
 
@@ -42,8 +43,6 @@ const historySchema = {
 };
 
 export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", tickers: string[]): Promise<HistoricalPricesPayload> => {
-  // FIX: Refactor to fix variable scope in catch block.
-  // The cache logic is moved outside the withRetry call to ensure `series` is available in the catch block as a fallback.
   const master = getStoredHistory();
   const series: PriceSeries[] = [];
   const tickersToFetch: string[] = [];
@@ -53,7 +52,13 @@ export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", t
   tickers.forEach(ticker => {
     const existing = master[ticker] || [];
     if (existing.length >= requiredPoints) {
-      series.push({ ticker, name: ticker, currency: "EUR", points: existing.slice(-requiredPoints) });
+      const companyInfo = COMPANIES.find(c => c.ticker === ticker);
+      series.push({ 
+        ticker, 
+        name: companyInfo?.name || ticker, 
+        currency: companyInfo?.currency || 'USD', 
+        points: existing.slice(-requiredPoints) 
+      });
     } else {
       tickersToFetch.push(ticker);
     }

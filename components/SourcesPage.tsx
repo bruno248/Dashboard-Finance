@@ -92,17 +92,25 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
     {
       label: 'MULTIPLES DE VALORISATION',
       metrics: [
+        { key: 'evEbitda', label: 'EV / EBITDA 24', type: 'multiple' },
         { key: 'evEbitdaForward', label: 'EV / EBITDA 25E', type: 'multiple' },
         { key: 'evEbitdaNext', label: 'EV / EBITDA 26E', type: 'multiple' },
+        { key: 'evEbit', label: 'EV / EBIT 24', type: 'multiple' },
         { key: 'evEbitForward', label: 'EV / EBIT 25E', type: 'multiple' },
+        { key: 'evEbitNext', label: 'EV / EBIT 26E', type: 'multiple' },
+        { key: 'per', label: 'PER 24', type: 'multiple' },
         { key: 'perForward', label: 'PER 25E', type: 'multiple' },
+        { key: 'perNext', label: 'PER 26E', type: 'multiple' },
+        { key: 'evEbitdaCapex', label: 'EV / (EBITDA-CAPEX) 24', type: 'multiple' },
         { key: 'evEbitdaCapexForward', label: 'EV / (EBITDA-CAPEX) 25E', type: 'multiple' },
+        { key: 'evEbitdaCapexNext', label: 'EV / (EBITDA-CAPEX) 26E', type: 'multiple' },
       ]
     },
     {
       label: 'STRUCTURE & RENDEMENT',
       metrics: [
         { key: 'marketCap', label: 'Capitalisation', type: 'currency' },
+        { key: 'ev', label: 'Valeur d’entreprise (EV)', type: 'currency' },
         { key: 'netDebt', label: 'Dette Nette', type: 'currency' },
         { key: 'sharesOutstanding', label: "Nombre d'actions (M)", type: 'number' },
         { key: 'dividendYield', label: 'Yield 2024', type: 'string' },
@@ -149,7 +157,7 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
       <div className="bg-slate-800 rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto no-scrollbar">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-900 text-slate-500 uppercase text-[10px] font-black border-b border-slate-700">
+            <thead className="bg-slate-900 text-slate-500 uppercase text-[10px] font-black border-b-2 border-slate-700">
               <tr>
                 <th className="px-8 py-6 sticky left-0 bg-slate-900 z-20 w-64 border-r border-slate-700">Agrégat / Multiple</th>
                 {filteredCompanies.map(c => (
@@ -160,8 +168,10 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
             <tbody className="divide-y divide-slate-700/50">
               {metricsGroups.map(group => (
                 <React.Fragment key={group.label}>
-                  <tr className="bg-slate-900/40">
-                    <td colSpan={filteredCompanies.length + 1} className="px-8 py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-slate-800 sticky left-0 border-r border-slate-700">{group.label}</td>
+                  <tr className="bg-slate-900">
+                    <td colSpan={filteredCompanies.length + 1} className="px-8 py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-slate-900 sticky left-0 border-r border-slate-700 border-b-2 border-slate-700">
+                      {group.label}
+                    </td>
                   </tr>
                   {group.metrics.map(m => (
                     <tr key={m.key} className="hover:bg-slate-700/20 group">

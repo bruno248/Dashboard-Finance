@@ -14,7 +14,7 @@ export type PricePoint = {
 export type PriceSeries = {
   ticker: string;
   name: string;
-  currency: "EUR" | "USD";
+  currency: string;
   points: PricePoint[];
 };
 
@@ -27,6 +27,7 @@ export interface Company {
   id: string;
   name: string;
   ticker: string;
+  currency: string;
   price: number;
   change: number;
   marketCap: string;
@@ -89,7 +90,7 @@ export interface Company {
   capexSales: number;
 
   rating: AnalystRating;
-  targetPrice: number;
+  targetPrice: number | null;
   description: string;
   sparkline: number[];
   volatility: number;
@@ -137,5 +138,11 @@ export interface SectorData {
   marketOpportunities: string[];
   marketRisks: string[];
   lastUpdated: string;
-  priceHistory?: { [ticker: string]: number[] }; 
+  priceHistory?: { [ticker: string]: number[] };
+  sentiment?: {
+    label: string;
+    description: string;
+    keyTakeaways: string[];
+    lastUpdated: string;
+  };
 }

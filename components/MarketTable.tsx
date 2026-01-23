@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Company, AnalystRating } from '../types';
 
@@ -24,8 +25,8 @@ export const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCom
           <thead className="bg-slate-800/50 border-b border-slate-700">
             <tr>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest">Valeur</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Cours (monnaie locale)</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif (monnaie locale)</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Cours (LC)</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif (LC)</th>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-center">Var. %</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">Cap.</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">EV/EBITDA 25E</th>
@@ -50,7 +51,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCom
                   {(company.price || 0).toFixed(2)}
                 </td>
                 <td className="px-4 md:px-6 py-4 font-bold text-emerald-400 text-right text-xs md:text-sm whitespace-nowrap">
-                  {(company.targetPrice || 0).toFixed(2)}
+                  {company.targetPrice ? company.targetPrice.toFixed(2) : '--'}
                 </td>
                 <td className={`px-4 md:px-6 py-4 font-black text-center text-xs md:text-sm ${(company.change || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {(company.change || 0) >= 0 ? '+' : ''}{(company.change || 0).toFixed(2)}%

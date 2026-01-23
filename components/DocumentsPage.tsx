@@ -18,25 +18,8 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
 
   const currentDocs = useMemo(() => {
     if (!data?.companyDocuments) return [];
-    
-    // FIX: Added more robust logic to find documents by ticker, handling different formats.
-    const foundKey = Object.keys(data.companyDocuments).find(k => k.toUpperCase() === selectedTicker.toUpperCase());
-    if (foundKey) return data.companyDocuments[foundKey];
-
-    // Attempt to match with different separators
-    const normalizedKey = selectedTicker.replace(/\./g, '_').toUpperCase();
-    if (data.companyDocuments[normalizedKey]) {
-      return data.companyDocuments[normalizedKey];
-    }
-    
-    // Fallback to partial matching
-    const partialMatchKey = Object.keys(data.companyDocuments).find(k => 
-      k.toUpperCase().includes(selectedTicker.toUpperCase()) || 
-      selectedTicker.toUpperCase().includes(k.toUpperCase())
-    );
-    if (partialMatchKey) return data.companyDocuments[partialMatchKey];
-    
-    return [];
+    // La clé est maintenant normalisée par le service, une recherche directe suffit.
+    return data.companyDocuments[selectedTicker.toUpperCase()] || [];
   }, [data?.companyDocuments, selectedTicker]);
 
   return (

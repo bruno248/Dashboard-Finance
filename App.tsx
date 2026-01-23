@@ -10,10 +10,10 @@ import DocumentsPage from './components/DocumentsPage';
 import CalendarPage from './components/CalendarPage';
 import SourcesPage from './components/SourcesPage';
 import ScreenerPage from './components/ScreenerPage';
-import { Company, SectorData, AnalystRating } from './types';
+import { Company, SectorData, AnalystRating, NewsItem } from './types';
 import { COMPANIES, NEWS, EVENTS, DOCUMENTS } from './constants';
 import { fetchRealTimeOOHData, fetchOOHQuotes, fetchOOHRatings, fetchOOHTargetPrices, FALLBACK_COMPANIES } from './services/aiService';
-import { fetchOOHNews, fetchOOHHighlights } from './services/newsService';
+import { fetchOOHNews, fetchOOHHighlights, fetchOOHSentimentFromNews } from './services/newsService';
 import { fetchOOHDocuments } from './services/documentService';
 import { fetchOOHAgenda } from './services/agendaService';
 import { parseFinancialValue, calculateEV } from './utils';
@@ -21,6 +21,7 @@ import { parseFinancialValue, calculateEV } from './utils';
 const CACHE_KEY = 'ooh_insight_v28_persistence';
 const FINANCIALS_TTL = 5 * 60 * 1000;
 const NEWS_TTL = 15 * 60 * 1000;
+const SENTIMENT_TTL = 2 * 60 * 60 * 1000; // 2 heures
 const DOCS_TTL = 120 * 60 * 1000;
 const CALENDAR_TTL = 240 * 60 * 1000;
 const HIGHLIGHTS_TTL = 24 * 60 * 60 * 1000;
@@ -211,7 +212,25 @@ const App: React.FC = () => {
     setLoadingStatus('Actualités...');
     try {
       const news = await fetchOOHNews(maxCount);
-      setData(prev => ({ ...prev, news, timestamps: { ...prev.timestamps, news: Date.now() } }));
+      const now = Date.now();
+      
+      setData(prev => {
+        // Déclencher le calcul du sentiment en arrière-plan si le TTL est dépassé
+        if (now - (prev.timestamps.sentiment || 0) > SENTIMENT_TTL) {
+          fetchOOHSentimentFromNews(news).then(sentimentAnalysis => {
+            setData(currentData => ({
+              ...currentData,
+              sentiment: {
+                ...sentimentAnalysis,
+                lastUpdated: new Date().toLocaleString(),
+              },
+              timestamps: { ...currentData.timestamps, sentiment: now }
+            }));
+          }).catch(console.error);
+        }
+        return { ...prev, news, timestamps: { ...prev.timestamps, news: now } };
+      });
+
     } catch (err) { console.error(err); }
     finally { setNewsLoading(false); setLoadingStatus(''); }
   }, []);
@@ -304,7 +323,7 @@ const App: React.FC = () => {
     if (selectedCompany) return <CompanyDetail company={selectedCompany} peers={data.companies as Company[]} onSelectCompany={handleSelectCompany} />;
     switch (activeTab) {
       case 'overview': return <DashboardOverview data={data} onSelectCompany={handleSelectCompany} />;
-      case 'news': return <NewsPage news={data.news} highlights={data.highlights} loading={newsLoading || highlightsLoading} />;
+      case 'news': return <NewsPage news={data.news} highlights={data.highlights} sentiment={data.sentiment} loading={newsLoading || highlightsLoading} />;
       case 'analysis': return <AnalysisPage data={data} />;
       case 'docs': return <DocumentsPage docs={data.documents} data={data} loading={docsLoading} />;
       case 'calendar': return <CalendarPage events={data.events} loading={calendarLoading} />;

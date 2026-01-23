@@ -82,8 +82,8 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany,
             </div>
           </div>
 
-          <div className="flex md:flex-col justify-between items-center md:items-end w-full md:w-auto bg-slate-900/40 md:bg-transparent p-6 md:p-0 rounded-3xl border md:border-0 border-slate-700">
-            <div className="flex flex-col md:items-end">
+          <div className="flex md:flex-col justify-between items-end w-full md:w-auto bg-slate-900/40 md:bg-transparent p-6 md:p-0 rounded-3xl border md:border-0 border-slate-700">
+            <div className="flex flex-col items-start md:items-end">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dernier Cours (monnaie locale)</span>
               <div className="text-4xl md:text-7xl font-black text-white tracking-tighter tabular-nums">
                 {(company.price).toFixed(2)}
@@ -92,6 +92,22 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany,
             <div className={`mt-2 px-4 py-2 rounded-2xl text-lg md:text-2xl font-black flex items-center gap-2 ${company.change >= 0 ? 'text-emerald-400 bg-emerald-500/5' : 'text-rose-400 bg-rose-500/5'}`}>
               {company.change >= 0 ? '▲' : '▼'} {Math.abs(company.change).toFixed(2)}%
             </div>
+          </div>
+        </div>
+
+        {/* METRICS BANDEAU */}
+        <div className="mt-8 pt-6 border-t border-slate-700/50 grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+          <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-700/50">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">EV/EBITDA 25E</span>
+            <span className="text-xl font-black text-white">{formatMultiple(company.evEbitdaForward)}</span>
+          </div>
+          <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-700/50">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">PER 25E</span>
+            <span className="text-xl font-black text-white">{formatMultiple(company.perForward)}</span>
+          </div>
+          <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-700/50">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">MARGE EBITDA 24</span>
+            <span className="text-xl font-black text-white">{company.ebitdaMargin.toFixed(1)}%</span>
           </div>
         </div>
 

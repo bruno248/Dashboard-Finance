@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DocumentItem } from "../types";
 import { cleanJsonResponse } from "../utils";
 
-const FALLBACK_DOCS = {
+const FALLBACK_DOCS: DocumentFetchResult = {
   "DEC.PA": [{ id: "d1", type: "Report", title: "Rapport Annuel 2023", date: "2024-03-15", url: "https://www.jcdecaux.com" }]
 };
 
@@ -57,14 +57,21 @@ export const fetchOOHDocuments = async (): Promise<DocumentFetchResult> => {
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     const result: DocumentFetchResult = {};
+    
     if (parsed.documentsByTicker && Array.isArray(parsed.documentsByTicker)) {
-      parsed.documentsByTicker.forEach((item: any) => {
-        if (item.ticker && Array.isArray(item.docs)) result[item.ticker.toUpperCase()] = item.docs;
+      parsed.documentsByTicker.forEach((item: { ticker: string, docs: DocumentItem[] }) => {
+        if (item.ticker && Array.isArray(item.docs)) {
+          // Normalise la clé pour garantir la cohérence (ex: DEC_PA -> DEC.PA)
+          const normalizedTicker = item.ticker.toUpperCase().replace(/_/g, '.');
+          result[normalizedTicker] = item.docs;
+        }
       });
-      return Object.keys(result).length > 0 ? result : FALLBACK_DOCS as any;
+      if (Object.keys(result).length > 0) return result;
     }
-    return FALLBACK_DOCS as any;
+    
+    return FALLBACK_DOCS;
   } catch (error) {
-    return FALLBACK_DOCS as any;
+    console.warn("fetchOOHDocuments failed, returning fallback.", error);
+    return FALLBACK_DOCS;
   }
 };

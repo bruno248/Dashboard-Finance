@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { Company, SectorData } from '../types';
 import { MarketTable } from './MarketTable';
-import { parseFinancialValue } from '../utils';
 
 interface DashboardOverviewProps {
   data: SectorData;
@@ -19,23 +19,26 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
   const companies = (data.companies as Company[]) || [];
   
   const stats = useMemo(() => {
-    if (!companies.length) return { avgMult: '0.0', avgUpside: '0' };
+    if (!companies.length) return { avgMult: '0.0', avgUpside: null, hasUpsideData: false };
     
     const key = yearView === '2025' ? 'evEbitdaForward' : 'evEbitdaNext';
-    const sumMult = companies.reduce((acc, c) => acc + ((c as any)[key] || 0), 0);
+    const validCompaniesForMult = companies.filter(c => (c as any)[key] > 0);
+    const sumMult = validCompaniesForMult.reduce((acc, c) => acc + ((c as any)[key] || 0), 0);
     
-    const upsides = companies.map(c => {
-      if (!c.price || !c.targetPrice) return 0;
-      return ((c.targetPrice - c.price) / c.price) * 100;
-    }).filter(u => u !== 0);
-    
-    const avgUpside = upsides.length ? (upsides.reduce((a, b) => a + b, 0) / upsides.length).toFixed(1) : '0.0';
+    const upsides = companies
+      .filter(c => c.price && c.targetPrice && c.targetPrice > 0)
+      .map(c => ((c.targetPrice - c.price) / c.price) * 100);
+      
+    const hasUpsideData = upsides.length > 0;
+    const avgUpside = hasUpsideData ? (upsides.reduce((a, b) => a + b, 0) / upsides.length).toFixed(1) : null;
 
     return {
-      avgMult: (sumMult / companies.length).toFixed(1),
-      avgUpside: avgUpside
+      avgMult: validCompaniesForMult.length > 0 ? (sumMult / validCompaniesForMult.length).toFixed(1) : '0.0',
+      avgUpside: avgUpside,
+      hasUpsideData: hasUpsideData,
     };
-  }, [companies, yearView]);
+}, [companies, yearView]);
+
 
   const topMovers = useMemo(() => {
     return [...companies].sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0)).slice(0, 3);
@@ -63,7 +66,11 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
         <div className="bg-slate-800 p-5 md:p-6 rounded-3xl border border-slate-700 shadow-xl flex flex-col justify-center">
           <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Potentiel de Hausse</h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl md:text-5xl font-black text-emerald-400">+{stats.avgUpside}%</span>
+            {stats.hasUpsideData ? (
+              <span className="text-3xl md:text-5xl font-black text-emerald-400">+{stats.avgUpside}%</span>
+            ) : (
+              <span className="text-3xl md:text-5xl font-black text-slate-500">N/A</span>
+            )}
             <span className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Upside Moyen</span>
           </div>
         </div>
@@ -90,18 +97,31 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
             <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Sentiment Marché</span>
           </div>
-          <h4 className="text-sm md:text-lg font-bold text-white line-clamp-2 leading-tight">
-            {(data.news?.[0]?.title) || "Analyse en cours..."}
-          </h4>
-          <p className="mt-2 text-slate-500 text-[9px] uppercase font-bold">
-             Dernier signal identifié
-          </p>
+          {data.sentiment ? (
+            <>
+              <h4 className="text-sm md:text-lg font-bold text-white leading-tight">
+                {data.sentiment.label}
+              </h4>
+              <p className="mt-2 text-slate-400 text-xs line-clamp-2">
+                {data.sentiment.description}
+              </p>
+            </>
+          ) : (
+             <>
+              <h4 className="text-sm md:text-lg font-bold text-white line-clamp-2 leading-tight">
+                Analyse en cours...
+              </h4>
+              <p className="mt-2 text-slate-500 text-[9px] uppercase font-bold">
+                 Le sentiment est en cours d'évaluation.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
       <section>
         <div className="flex items-center justify-between mb-4 px-1">
-          <h2 className="text-lg md:text-xl font-bold text-white">Cotes Sectorielles (monnaie locale)</h2>
+          <h2 className="text-lg md:text-xl font-bold text-white">Cotes Sectorielles (LC)</h2>
         </div>
         <MarketTable companies={companies} onSelectCompany={onSelectCompany} />
       </section>
@@ -122,7 +142,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
             >
               <div className="flex items-center gap-2 mb-3">
                 <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
-                  // FIX: Changed 'Acquisition' to 'Deals' to match the NewsTag type.
                   n.tag === 'Deals' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-900 text-emerald-400 border-slate-700'
                 }`}>
                   {n.tag || 'Market'}

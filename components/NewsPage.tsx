@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { NewsItem, NewsTag } from '../types';
+import { NewsItem, NewsTag, SectorData } from '../types';
 import { summarizeNewsItem } from '../services/newsService';
 
 interface NewsPageProps {
   news: NewsItem[];
   highlights?: NewsItem[];
+  sentiment?: SectorData['sentiment'];
   loading?: boolean;
 }
 
@@ -16,7 +17,7 @@ const AIBadge: React.FC<{className?: string}> = ({className}) => (
   </div>
 );
 
-const NewsPage: React.FC<NewsPageProps> = ({ news, highlights, loading }) => {
+const NewsPage: React.FC<NewsPageProps> = ({ news, highlights, sentiment, loading }) => {
   const [filter, setFilter] = useState('All');
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -69,6 +70,28 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, highlights, loading }) => {
 
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20 md:pb-0">
+      
+      <section className="bg-slate-800/60 p-6 rounded-2xl border border-slate-700/80 shadow-xl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base font-bold text-white">À retenir (Flux 7 jours)</h3>
+          <AIBadge />
+        </div>
+        {sentiment?.keyTakeaways && sentiment.keyTakeaways.length > 0 ? (
+          <ul className="space-y-2 list-none p-0">
+            {sentiment.keyTakeaways.map((item, index) => (
+              <li key={index} className="flex items-start gap-3 text-sm text-slate-300">
+                <span className="text-emerald-500 font-black mt-1">•</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400 italic">
+            En attente d'analyse IA pour extraire les points clés du flux...
+          </p>
+        )}
+      </section>
+
       <section className="space-y-4 md:space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 px-1">
           <div className="flex items-center gap-4">

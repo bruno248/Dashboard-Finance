@@ -5,7 +5,7 @@ import { cleanJsonResponse, withRetry } from "../utils";
 
 export const FALLBACK_COMPANIES = [
   { 
-    ticker: "DEC.PA", price: 0, change: 0, netDebt: "920 M", sharesOutstanding: 212, dividendYield: "3.5%", dividendPerShare2024: "0.70", dividendPerShare2025: "0.80", dividendPerShare2026: "0.90",
+    ticker: "DEC.PA", price: 0, change: 0, netDebt: "920 M", sharesOutstanding: 212, dividendYield: "--", dividendPerShare2024: "0.70", dividendPerShare2025: "0.80", dividendPerShare2026: "0.90",
     revenue2024: "3570 M", revenue2025: "3750 M", revenue2026: "3940 M",
     ebitda2024: "765 M", ebitda2025: "810 M", ebitda2026: "860 M",
     ebit2024: "285 M", ebit2025: "320 M", ebit2026: "360 M",
@@ -14,7 +14,7 @@ export const FALLBACK_COMPANIES = [
     fcf2024: "200 M", fcf2025: "240 M", fcf2026: "280 M"
   },
   { 
-    ticker: "LAMR", price: 0, change: 0, netDebt: "3150 M", sharesOutstanding: 102, dividendYield: "3.9%", dividendPerShare2024: "5.20", dividendPerShare2025: "5.40", dividendPerShare2026: "5.60",
+    ticker: "LAMR", price: 0, change: 0, netDebt: "3150 M", sharesOutstanding: 102, dividendYield: "--", dividendPerShare2024: "5.20", dividendPerShare2025: "5.40", dividendPerShare2026: "5.60",
     revenue2024: "2150 M", revenue2025: "2300 M", revenue2026: "2450 M",
     ebitda2024: "980 M", ebitda2025: "1050 M", ebitda2026: "1120 M",
     ebit2024: "810 M", ebit2025: "870 M", ebit2026: "940 M",
@@ -23,7 +23,7 @@ export const FALLBACK_COMPANIES = [
     fcf2024: "620 M", fcf2025: "680 M", fcf2026: "740 M"
   },
   { 
-    ticker: "SAX.DE", price: 0, change: 0, netDebt: "1450 M", sharesOutstanding: 57, dividendYield: "3.2%", dividendPerShare2024: "1.85", dividendPerShare2025: "1.95", dividendPerShare2026: "2.10",
+    ticker: "SAX.DE", price: 0, change: 0, netDebt: "1450 M", sharesOutstanding: 57, dividendYield: "--", dividendPerShare2024: "1.85", dividendPerShare2025: "1.95", dividendPerShare2026: "2.10",
     revenue2024: "1820 M", revenue2025: "1910 M", revenue2026: "2000 M",
     ebitda2024: "540 M", ebitda2025: "570 M", ebitda2026: "600 M",
     ebit2024: "320 M", ebit2025: "350 M", ebit2026: "380 M",
@@ -32,7 +32,7 @@ export const FALLBACK_COMPANIES = [
     fcf2024: "310 M", fcf2025: "340 M", fcf2026: "370 M"
   },
   { 
-    ticker: "OUT", price: 0, change: 0, netDebt: "2500 M", sharesOutstanding: 167, dividendYield: "6.5%", dividendPerShare2024: "1.22", dividendPerShare2025: "1.25", dividendPerShare2026: "1.28",
+    ticker: "OUT", price: 0, change: 0, netDebt: "2500 M", sharesOutstanding: 167, dividendYield: "--", dividendPerShare2024: "1.22", dividendPerShare2025: "1.25", dividendPerShare2026: "1.28",
     revenue2024: "1850 M", revenue2025: "1950 M", revenue2026: "2050 M",
     ebitda2024: "450 M", ebitda2025: "480 M", ebitda2026: "510 M",
     ebit2024: "250 M", ebit2025: "270 M", ebit2026: "290 M",
@@ -41,7 +41,7 @@ export const FALLBACK_COMPANIES = [
     fcf2024: "200 M", fcf2025: "220 M", fcf2026: "240 M"
   },
   {
-    ticker: "CCO", price: 0, change: 0, netDebt: "5100 M", sharesOutstanding: 485, dividendYield: "0.0%", dividendPerShare2024: "0.00", dividendPerShare2025: "0.00", dividendPerShare2026: "0.00",
+    ticker: "CCO", price: 0, change: 0, netDebt: "5100 M", sharesOutstanding: 485, dividendYield: "--", dividendPerShare2024: "0.00", dividendPerShare2025: "0.00", dividendPerShare2026: "0.00",
     revenue2024: "2200 M", revenue2025: "2250 M", revenue2026: "2300 M",
     ebitda2024: "550 M", ebitda2025: "580 M", ebitda2026: "610 M",
     ebit2024: "150 M", ebit2025: "170 M", ebit2026: "190 M",
@@ -50,7 +50,7 @@ export const FALLBACK_COMPANIES = [
     fcf2024: "50 M", fcf2025: "70 M", fcf2026: "90 M"
   },
   {
-    ticker: "4071.SR", price: 0, change: 0, netDebt: "0 M", sharesOutstanding: 50, dividendYield: "2.8%", dividendPerShare2024: "5.50", dividendPerShare2025: "6.00", dividendPerShare2026: "6.50",
+    ticker: "4071.SR", price: 0, change: 0, netDebt: "0 M", sharesOutstanding: 50, dividendYield: "--", dividendPerShare2024: "5.50", dividendPerShare2025: "6.00", dividendPerShare2026: "6.50",
     revenue2024: "1100 M", revenue2025: "1300 M", revenue2026: "1500 M",
     ebitda2024: "450 M", ebitda2025: "550 M", ebitda2026: "650 M",
     ebit2024: "430 M", ebit2025: "530 M", ebit2026: "630 M",
@@ -60,14 +60,7 @@ export const FALLBACK_COMPANIES = [
   }
 ];
 
-const FALLBACK_QUOTES = [
-  { ticker: "DEC.PA", price: 19.85, change: 0.8 },
-  { ticker: "LAMR", price: 134.20, change: -0.3 },
-  { ticker: "SAX.DE", price: 58.40, change: 1.5 },
-  { ticker: "OUT", price: 18.75, change: -1.2 },
-  { ticker: "4071.SR", price: 194.50, change: 1.1 },
-  { ticker: "CCO", price: 1.62, change: -2.4 }
-];
+const FALLBACK_QUOTES: { ticker: string; price: number; change: number }[] = [];
 
 export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: string; price: number; change: number }[]> {
   return withRetry(async () => {

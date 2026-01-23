@@ -124,3 +124,45 @@ export const summarizeNewsItem = async (title: string, source: string): Promise<
     return response.text || "Résumé indisponible.";
   }).catch(() => "Le service de résumé est temporairement indisponible.");
 };
+
+export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ label: string; description: string; keyTakeaways: string[] }> => {
+  const fallback = { label: "Neutre", description: "Aucune actualité récente à analyser.", keyTakeaways: [] };
+  if (!news || news.length === 0) {
+    return fallback;
+  }
+
+  const newsTitles = news.slice(0, 20).map(n => `- ${n.title} [${n.tag}]`).join('\n');
+  const sentimentSchema = {
+    type: Type.OBJECT,
+    properties: {
+      label: { type: Type.STRING, description: "Un label court: 'Plutôt positif', 'Neutre', 'Plutôt négatif'." },
+      description: { type: Type.STRING, description: "Une description de 1-2 phrases expliquant le sentiment global pour le secteur OOH." },
+      keyTakeaways: {
+        type: Type.ARRAY,
+        description: "Une liste de 2-3 points clés (phrases courtes) à retenir.",
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["label", "description", "keyTakeaways"],
+  };
+
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `En tant qu'analyste financier, analyse ces titres d'actualités du secteur OOH:\n${newsTitles}\n\nQuel est le sentiment de marché global qui s'en dégage ? Fournis aussi 2-3 points clés à retenir. Réponds en français.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: sentimentSchema,
+        temperature: 0.2,
+        maxOutputTokens: 400,
+      }
+    });
+    const parsed = JSON.parse(cleanJsonResponse(response.text));
+    return parsed || { ...fallback, label: "Analyse Indisponible" };
+  }).catch(() => ({
+    ...fallback,
+    label: "Analyse Indisponible",
+    description: "Le service d'analyse est momentanément indisponible."
+  }));
+};
