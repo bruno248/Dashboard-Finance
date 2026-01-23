@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 
 interface SidebarProps {
@@ -82,6 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         <div className="px-3 mb-4">
           <button 
             onClick={handleKeySelection}
+            title={hasCustomKey ? "Gérer votre clé API personnelle" : "Configurer votre propre clé API pour des performances optimales"}
             className={`w-full p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 ${
               hasCustomKey 
                 ? 'bg-emerald-500/5 border-emerald-500/30 hover:bg-emerald-500/10' 

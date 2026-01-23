@@ -1,31 +1,60 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Company } from '../types';
-import { COMPANIES } from '../constants';
 import Sparkline from './Sparkline';
 import { formatCurrencyShort, formatMultiple } from '../utils';
+import { fetchHistoricalPrices } from '../services/historicalService';
 
 interface CompanyDetailProps {
   company: Company;
   onSelectCompany: (company: Company) => void;
+  peers: Company[];
 }
 
-const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany }) => {
+const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany, peers }) => {
   const [range, setRange] = useState<'1M' | '6M' | '1A'>('1A');
+  const [historyPoints, setHistoryPoints] = useState<number[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  const simulatedHistory = useMemo(() => {
-    const points = range === '1M' ? 30 : range === '6M' ? 60 : 120;
-    const history = [];
-    let cur = company.price * (0.85 + Math.random() * 0.1);
-    for (let i = 0; i < points; i++) {
-      cur *= (0.995 + Math.random() * 0.01);
-      history.push(cur);
-    }
-    history[points - 1] = company.price;
+  const generateFallbackHistory = (price: number, points: number): number[] => {
+    let cur = price * (0.85 + Math.random() * 0.1);
+    const history = Array.from({ length: points - 1 }, () => cur *= (0.995 + Math.random() * 0.01));
+    history.push(price);
     return history;
-  }, [company.id, range]);
+  };
 
-  const maxPrice = Math.max(...simulatedHistory) * 1.05;
+  useEffect(() => {
+    const mapRangeToPeriod = (r: '1M' | '6M' | '1A'): "1M" | "6M" | "1Y" => {
+      if (r === '1A') return '1Y';
+      return r;
+    };
+
+    const loadHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const period = mapRangeToPeriod(range);
+        const result = await fetchHistoricalPrices(period, [company.ticker]);
+        const companySeries = result.series.find(s => s.ticker === company.ticker);
+
+        if (companySeries && companySeries.points.length > 1) {
+          setHistoryPoints(companySeries.points.map(p => p.price));
+        } else {
+          const points = range === '1M' ? 30 : range === '6M' ? 60 : 120;
+          setHistoryPoints(generateFallbackHistory(company.price, points));
+        }
+      } catch (error) {
+        console.error("Failed to fetch history for company detail, using fallback", error);
+        const points = range === '1M' ? 30 : range === '6M' ? 60 : 120;
+        setHistoryPoints(generateFallbackHistory(company.price, points));
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
+  }, [company.ticker, company.price, range]);
+
+  const maxPrice = historyPoints.length > 0 ? Math.max(...historyPoints) * 1.05 : company.price;
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-700 pb-20">
@@ -55,9 +84,9 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
 
           <div className="flex md:flex-col justify-between items-center md:items-end w-full md:w-auto bg-slate-900/40 md:bg-transparent p-6 md:p-0 rounded-3xl border md:border-0 border-slate-700">
             <div className="flex flex-col md:items-end">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dernier Cours</span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dernier Cours (monnaie locale)</span>
               <div className="text-4xl md:text-7xl font-black text-white tracking-tighter tabular-nums">
-                {(company.price).toFixed(2)}<span className="text-lg md:text-2xl text-slate-600 ml-2 font-black">EUR</span>
+                {(company.price).toFixed(2)}
               </div>
             </div>
             <div className={`mt-2 px-4 py-2 rounded-2xl text-lg md:text-2xl font-black flex items-center gap-2 ${company.change >= 0 ? 'text-emerald-400 bg-emerald-500/5' : 'text-rose-400 bg-rose-500/5'}`}>
@@ -80,6 +109,8 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
              </div>
           </div>
           <div className="h-48 md:h-64 relative">
+            {isLoadingHistory && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/20 z-10"><div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}
+            {historyPoints.length > 1 && (
              <svg width="100%" height="100%" viewBox="0 0 1000 200" preserveAspectRatio="none" className="overflow-visible">
                 <defs>
                   <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
@@ -88,11 +119,11 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
                   </linearGradient>
                 </defs>
                 <path 
-                  d={`M 0,200 L ${simulatedHistory.map((v, i) => `${(i / (simulatedHistory.length - 1)) * 1000},${200 - (v / maxPrice) * 180}`).join(' L ')} L 1000,200 Z`} 
+                  d={`M 0,200 L ${historyPoints.map((v, i) => `${(i / (historyPoints.length - 1)) * 1000},${200 - (v / maxPrice) * 180}`).join(' L ')} L 1000,200 Z`} 
                   fill="url(#chartGradient)" 
                 />
                 <path 
-                  d={`M ${simulatedHistory.map((v, i) => `${(i / (simulatedHistory.length - 1)) * 1000},${200 - (v / maxPrice) * 180}`).join(' L ')}`} 
+                  d={`M ${historyPoints.map((v, i) => `${(i / (historyPoints.length - 1)) * 1000},${200 - (v / maxPrice) * 180}`).join(' L ')}`} 
                   fill="none" 
                   stroke="#10b981" 
                   strokeWidth="4" 
@@ -100,6 +131,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
                   strokeLinejoin="round"
                 />
              </svg>
+            )}
           </div>
         </div>
       </section>
@@ -143,7 +175,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
 
         {/* ESTIMATED FINANCIALS (REVENUE / EBITDA / NET INCOME) */}
         <div className="lg:col-span-2 space-y-6">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-4">Consensus & Estimations (M€)</h3>
+          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-4">Consensus & Estimations (M Locale)</h3>
           <div className="bg-slate-800 rounded-[2.5rem] border border-slate-700 shadow-2xl overflow-hidden">
             <table className="w-full text-left">
               <thead className="bg-slate-900/50 border-b border-slate-700">
@@ -205,7 +237,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany 
       <section className="space-y-6">
         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-4">Valeurs Similaires</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {COMPANIES.filter(p => p.id !== company.id).slice(0, 3).map(p => (
+          {peers.filter(p => p.id !== company.id).slice(0, 3).map(p => (
             <button 
               key={p.id} 
               onClick={() => onSelectCompany(p)} 

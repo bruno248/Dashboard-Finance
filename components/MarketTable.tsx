@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Company, AnalystRating } from '../types';
 
@@ -7,7 +6,7 @@ interface MarketTableProps {
   onSelectCompany: (company: Company) => void;
 }
 
-const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany }) => {
+export const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany }) => {
   const getRatingColor = (rating: AnalystRating) => {
     switch (rating) {
       case AnalystRating.BUY: return 'text-emerald-400 bg-emerald-500/10';
@@ -25,8 +24,8 @@ const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany })
           <thead className="bg-slate-800/50 border-b border-slate-700">
             <tr>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest">Valeur</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Cours (LC)</th>
-              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif (LC)</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Cours (monnaie locale)</th>
+              <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-right">Objectif (monnaie locale)</th>
               <th className="px-4 md:px-6 py-4 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase tracking-widest text-center">Var. %</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">Cap.</th>
               <th className="hidden lg:table-cell px-6 py-4 font-semibold text-slate-400 text-[10px] uppercase tracking-widest text-right">EV/EBITDA 25E</th>
@@ -35,14 +34,14 @@ const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany })
           </thead>
           <tbody className="divide-y divide-slate-700">
             {companies.map((company) => (
-              <tr key={company.id} className="hover:bg-slate-700/30 transition-colors cursor-pointer group" onClick={() => onSelectCompany(company)}>
+              <tr key={company.id} className="hover:bg-slate-700/30 transition-colors duration-200 ease-in-out cursor-pointer group" onClick={() => onSelectCompany(company)}>
                 <td className="px-4 md:px-6 py-4">
                   <div className="flex items-center gap-2 md:gap-3">
                     <div className="w-7 h-7 md:w-8 md:h-8 rounded bg-slate-700 flex items-center justify-center font-bold text-[9px] md:text-[10px] text-emerald-400 shadow-inner">
                       {(company.ticker || '???').substring(0, 3)}
                     </div>
                     <div>
-                      <p className="font-bold text-white text-xs md:text-sm group-hover:text-emerald-400 truncate max-w-[80px] md:max-w-none">{company.name}</p>
+                      <p className="font-bold text-white text-xs md:text-sm group-hover:text-emerald-400 truncate max-w-[80px] md:max-w-none transition-colors">{company.name}</p>
                       <p className="text-[8px] md:text-[10px] text-slate-500 font-bold uppercase tracking-tight">{company.ticker}</p>
                     </div>
                   </div>
@@ -75,5 +74,3 @@ const MarketTable: React.FC<MarketTableProps> = ({ companies, onSelectCompany })
     </div>
   );
 };
-
-export default MarketTable;

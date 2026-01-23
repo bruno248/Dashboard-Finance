@@ -104,6 +104,7 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
       metrics: [
         { key: 'marketCap', label: 'Capitalisation', type: 'currency' },
         { key: 'netDebt', label: 'Dette Nette', type: 'currency' },
+        { key: 'sharesOutstanding', label: "Nombre d'actions (M)", type: 'number' },
         { key: 'dividendYield', label: 'Yield 2024', type: 'string' },
         { key: 'dividendYield2025', label: 'Yield 2025E', type: 'string' },
         { key: 'dividendYield2026', label: 'Yield 2026E', type: 'string' },

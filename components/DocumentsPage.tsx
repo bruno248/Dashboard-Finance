@@ -5,11 +5,10 @@ import { DocumentItem, SectorData } from '../types';
 interface DocumentsPageProps {
   docs: DocumentItem[]; 
   data?: SectorData;
-  onRefreshDocs?: () => void;
   loading?: boolean;
 }
 
-const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs, loading }) => {
+const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) => {
   const companies = useMemo(() => 
     data?.companies.map(c => c.ticker).filter(Boolean) as string[] || ['DEC.PA', 'LAMR', 'OUT', 'SAX.DE', 'CCO'], 
     [data?.companies]
@@ -20,25 +19,23 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
   const currentDocs = useMemo(() => {
     if (!data?.companyDocuments) return [];
     
-    // Tentative de correspondance directe
-    if (data.companyDocuments[selectedTicker]) {
-      return data.companyDocuments[selectedTicker];
-    }
-    
-    // Normalisation (points -> underscores, etc)
+    // FIX: Added more robust logic to find documents by ticker, handling different formats.
+    const foundKey = Object.keys(data.companyDocuments).find(k => k.toUpperCase() === selectedTicker.toUpperCase());
+    if (foundKey) return data.companyDocuments[foundKey];
+
+    // Attempt to match with different separators
     const normalizedKey = selectedTicker.replace(/\./g, '_').toUpperCase();
     if (data.companyDocuments[normalizedKey]) {
       return data.companyDocuments[normalizedKey];
     }
     
-    // Recherche partielle
-    const foundKey = Object.keys(data.companyDocuments).find(k => 
+    // Fallback to partial matching
+    const partialMatchKey = Object.keys(data.companyDocuments).find(k => 
       k.toUpperCase().includes(selectedTicker.toUpperCase()) || 
       selectedTicker.toUpperCase().includes(k.toUpperCase())
     );
+    if (partialMatchKey) return data.companyDocuments[partialMatchKey];
     
-    if (foundKey) return data.companyDocuments[foundKey];
-
     return [];
   }, [data?.companyDocuments, selectedTicker]);
 
@@ -71,16 +68,6 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
             <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Accès aux rapports institutionnels extraits en temps réel</p>
           </div>
           <div className="flex items-center gap-4">
-             {onRefreshDocs && (
-               <button 
-                 onClick={onRefreshDocs}
-                 disabled={loading}
-                 className={`p-3 bg-slate-900 text-emerald-400 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-all shadow-lg group ${loading ? 'opacity-50' : ''}`}
-                 title="Actualiser les documents"
-               >
-                 <svg className={`w-5 h-5 transition-transform duration-500 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-               </button>
-             )}
              <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 shadow-inner whitespace-nowrap">
                {currentDocs.length} PUBLICATIONS
              </span>
@@ -102,9 +89,8 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
                 </div>
                 <div className="flex justify-between items-start mb-6">
                   <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                    doc.title.toLowerCase().includes('10-k') || doc.title.toLowerCase().includes('annuel') ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                    doc.title.toLowerCase().includes('10-q') || doc.title.toLowerCase().includes('trimestriel') ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                    doc.title.toLowerCase().includes('investor') || doc.title.toLowerCase().includes('presentation') ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                    doc.type === 'Report' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    doc.type === 'PPT' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
                     'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                   }`}>
                     {doc.type || 'DOCUMENT'}
@@ -113,7 +99,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
                 </div>
                 <h4 className="text-xl font-bold text-slate-100 group-hover:text-emerald-400 transition-colors mb-4 line-clamp-2 leading-snug">{doc.title}</h4>
                 <div className="mt-auto pt-6 border-t border-slate-700/50 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Finance {selectedTicker} Portal</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Source: {selectedTicker}</span>
                   <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black opacity-0 group-hover:opacity-100 transition-all uppercase tracking-widest">
                     Consulter
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -127,7 +113,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, onRefreshDocs
                 <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               </div>
               <p className="text-slate-400 font-bold uppercase tracking-widest text-sm italic">Documents non identifiés pour {selectedTicker}</p>
-              <p className="text-[10px] text-slate-600 mt-2 uppercase font-black">Utilisez le bouton de rafraîchissement global pour relancer Gemini</p>
+              <p className="text-[10px] text-slate-600 mt-2 uppercase font-black">Utilisez le bouton de rafraîchissement pour relancer la recherche</p>
             </div>
           )}
         </div>

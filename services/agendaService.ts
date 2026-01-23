@@ -1,7 +1,7 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { EventItem } from "../types";
-import { cleanJsonResponse } from "../utils";
+import { cleanJsonResponse, withRetry } from "../utils";
 
 const FALLBACK_AGENDA: EventItem[] = [
   { id: "e1", title: "JCDecaux Full Year 2024 Results", date: "2025-03-06", type: "Earnings" },
@@ -12,28 +12,50 @@ const FALLBACK_AGENDA: EventItem[] = [
   { id: "e6", title: "JCDecaux Q1 2025 Revenue", date: "2025-05-15", type: "Earnings" }
 ];
 
+const agendaSchema = {
+    type: Type.OBJECT,
+    properties: {
+        events: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    id: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    date: { type: Type.STRING, description: "Date in 'YYYY-MM-DD' format" },
+                    type: { type: Type.STRING, description: "e.g., 'Earnings', 'Shareholder Meeting'" },
+                },
+                required: ["id", "title", "date", "type"]
+            },
+        },
+    },
+    required: ["events"]
+};
+
+
 export const fetchOOHAgenda = async (): Promise<EventItem[]> => {
-  try {
-    // Move initialization inside the function call to ensure the latest API key is used
+  return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: "Prochaines dates earnings OOH 2025 en JSON. Format: { \"events\": [ { \"id\": \"string\", \"title\": \"string\", \"date\": \"YYYY-MM-DD\", \"type\": \"string\" } ] }",
+      model: "gemini-3-pro-preview",
+      contents: "Trouve les prochaines dates de publication de résultats financiers ('earnings') pour les entreprises du secteur OOH (Out-of-Home media) pour 2025.",
       config: { 
         tools: [{ googleSearch: {} }], 
-        responseMimeType: "application/json" 
+        responseMimeType: "application/json",
+        responseSchema: agendaSchema,
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingBudget: 1024 },
       }
     });
-    
-    if (!response.text) throw new Error("Empty response");
     
     const cleaned = cleanJsonResponse(response.text);
     const parsed = JSON.parse(cleaned);
     return (parsed.events && Array.isArray(parsed.events) && parsed.events.length > 0) 
       ? parsed.events 
       : FALLBACK_AGENDA;
-  } catch (error) {
-    console.warn("fetchOOHAgenda: API quota exceeded or error. Returning fallback data.");
+  }).catch((error) => {
+    console.warn("fetchOOHAgenda: API error or quota exceeded. Returning fallback data.", error);
     return FALLBACK_AGENDA;
-  }
+  });
 };

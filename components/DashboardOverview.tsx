@@ -1,13 +1,18 @@
-
 import React, { useState, useMemo } from 'react';
 import { Company, SectorData } from '../types';
-import MarketTable from './MarketTable';
+import { MarketTable } from './MarketTable';
 import { parseFinancialValue } from '../utils';
 
 interface DashboardOverviewProps {
   data: SectorData;
   onSelectCompany: (company: Company) => void;
 }
+
+const AIBadge: React.FC = () => (
+  <span className="absolute top-4 right-4 text-[8px] font-black text-emerald-700 bg-emerald-400/20 px-2 py-0.5 rounded-full border border-emerald-500/20">
+    Données IA
+  </span>
+);
 
 const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCompany }) => {
   const [yearView, setYearView] = useState<'2025' | '2026'>('2025');
@@ -39,10 +44,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-700 pb-20">
       
-      {/* Grille de Metrics - Épurée */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         
-        {/* Multiple OOH */}
         <div className="bg-slate-800 p-5 md:p-6 rounded-3xl border border-slate-700 shadow-xl">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Multiple Sectoriel</h3>
@@ -57,7 +60,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
           </div>
         </div>
 
-        {/* Upside Moyen */}
         <div className="bg-slate-800 p-5 md:p-6 rounded-3xl border border-slate-700 shadow-xl flex flex-col justify-center">
           <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Potentiel de Hausse</h3>
           <div className="flex items-baseline gap-2">
@@ -67,7 +69,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
         </div>
       </div>
 
-      {/* Top Variations et Flash Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-slate-800 p-5 md:p-6 rounded-3xl border border-slate-700 shadow-xl">
           <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Top Variations</h3>
@@ -83,7 +84,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
           </div>
         </div>
 
-        <div className="bg-emerald-900/10 p-5 md:p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col justify-center">
+        <div className="bg-emerald-900/10 p-5 md:p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col justify-center relative">
+          <AIBadge />
           <div className="flex items-center gap-2 mb-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
             <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Sentiment Marché</span>
@@ -92,20 +94,18 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
             {(data.news?.[0]?.title) || "Analyse en cours..."}
           </h4>
           <p className="mt-2 text-slate-500 text-[9px] uppercase font-bold">
-             Dernier signal identifié par l'IA
+             Dernier signal identifié
           </p>
         </div>
       </div>
 
-      {/* Market Table */}
       <section>
         <div className="flex items-center justify-between mb-4 px-1">
-          <h2 className="text-lg md:text-xl font-bold text-white">Cotes Sectorielles</h2>
+          <h2 className="text-lg md:text-xl font-bold text-white">Cotes Sectorielles (monnaie locale)</h2>
         </div>
         <MarketTable companies={companies} onSelectCompany={onSelectCompany} />
       </section>
 
-      {/* Flux d'actualités complet en bas */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-lg font-bold text-white">Flux d'actualités</h2>
@@ -122,7 +122,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
             >
               <div className="flex items-center gap-2 mb-3">
                 <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
-                  n.tag === 'Acquisition' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-900 text-emerald-400 border-slate-700'
+                  // FIX: Changed 'Acquisition' to 'Deals' to match the NewsTag type.
+                  n.tag === 'Deals' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-900 text-emerald-400 border-slate-700'
                 }`}>
                   {n.tag || 'Market'}
                 </span>

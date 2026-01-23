@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { DocumentItem } from "../types";
 import { cleanJsonResponse } from "../utils";
 
@@ -9,14 +9,51 @@ const FALLBACK_DOCS = {
 
 export interface DocumentFetchResult { [ticker: string]: DocumentItem[]; }
 
+const docSchema = {
+  type: Type.OBJECT,
+  properties: {
+    documentsByTicker: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          ticker: { type: Type.STRING },
+          docs: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING, description: "A unique ID for the document" },
+                type: { type: Type.STRING, description: "Type of document, e.g., 'Report', 'PPT', 'ESG'" },
+                title: { type: Type.STRING },
+                date: { type: Type.STRING, description: "Publication date in 'YYYY-MM-DD' format" },
+                url: { type: Type.STRING, description: "Direct link to the document if available" },
+              },
+              required: ["id", "type", "title", "date"]
+            },
+          },
+        },
+        required: ["ticker", "docs"]
+      },
+    },
+  },
+  required: ["documentsByTicker"]
+};
+
 export const fetchOOHDocuments = async (): Promise<DocumentFetchResult> => {
   try {
-    // Move initialization inside the function call to ensure the latest API key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: "Find latest financial reports for JCDecaux, Lamar, Ströer. JSON: { 'documentsByTicker': [ { 'ticker': 'string', 'docs': [...] } ] }",
-      config: { tools: [{ googleSearch: {} }], responseMimeType: "application/json" }
+      model: "gemini-3-pro-preview",
+      contents: "Find latest financial reports (annual, quarterly, investor presentations) for OOH companies JCDecaux, Lamar Advertising, and Ströer.",
+      config: { 
+        tools: [{ googleSearch: {} }], 
+        responseMimeType: "application/json",
+        responseSchema: docSchema,
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingBudget: 1024 },
+      }
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     const result: DocumentFetchResult = {};

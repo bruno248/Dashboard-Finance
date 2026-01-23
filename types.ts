@@ -36,7 +36,13 @@ export interface Company {
   dividendYield: string;
   dividendYieldNumeric?: number;
   dividendYield2025?: string;
+  dividendYield2025Numeric?: number;
   dividendYield2026?: string;
+  dividendYield2026Numeric?: number;
+  sharesOutstanding: number; // in millions
+  dividendPerShare2024?: string;
+  dividendPerShare2025?: string;
+  dividendPerShare2026?: string;
   
   // Historical & Estimates (Aggregates)
   revenue2024: string;
@@ -91,12 +97,15 @@ export interface Company {
   earningsProgress: number;
 }
 
+export type NewsTag = 'Market' | 'Corporate' | 'Earnings' | 'Deals' | 'Digital' | 'Regulation';
+
 export interface NewsItem {
   id: string | number;
   source: string;
   title: string;
   time: string;
-  tag: 'Corporate' | 'Market' | 'Analysis' | 'Earnings' | 'Digital' | 'Acquisition' | 'Trends' | 'Deals' | 'Regulation' | 'Company';
+  date?: string;
+  tag: NewsTag;
   url?: string;
   ticker?: string;
   region?: string;
@@ -120,6 +129,7 @@ export interface DocumentItem {
 export interface SectorData {
   companies: Partial<Company>[];
   news: NewsItem[];
+  highlights?: NewsItem[];
   events: EventItem[];
   documents: DocumentItem[]; 
   companyDocuments?: { [ticker: string]: DocumentItem[] }; 
