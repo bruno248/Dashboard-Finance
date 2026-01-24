@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NewsItem, NewsTag, SectorData } from '../types';
 import { summarizeNewsItem } from '../services/newsService';
 
@@ -34,6 +34,12 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, highlights, sentiment, loadin
   const filteredNews = news.filter(item => 
     filter === 'All' || item.tag?.toLowerCase() === filter.toLowerCase()
   );
+
+  const filteredHighlights = useMemo(() => {
+    if (!highlights) return [];
+    if (filter === 'All') return highlights;
+    return highlights.filter(item => item.tag?.toLowerCase() === filter.toLowerCase());
+  }, [highlights, filter]);
 
   const handleSummarize = async () => {
     if (!selectedNews) return;
@@ -142,19 +148,27 @@ const NewsPage: React.FC<NewsPageProps> = ({ news, highlights, sentiment, loadin
             <h2 className="text-xl md:text-2xl font-black text-white">Actualités Marquantes</h2>
             <p className="text-[9px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">12 derniers mois</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-            {highlights.map((item) => (
-              <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer" className="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/60 hover:border-emerald-500/50 transition-all group block shadow-lg">
-                <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors leading-snug line-clamp-2 mb-3">{item.title}</p>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${getTagStyle(item.tag)}`}>{item.tag}</span>
-                  <span className="text-[8px] font-bold text-slate-600 uppercase">
-                    {item.source} • {item.date && new Date(item.date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
+          {filteredHighlights.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              {filteredHighlights.map((item) => (
+                <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer" className="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/60 hover:border-emerald-500/50 transition-all group block shadow-lg">
+                  <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors leading-snug line-clamp-2 mb-3">{item.title}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${getTagStyle(item.tag)}`}>{item.tag}</span>
+                    <span className="text-[8px] font-bold text-slate-600 uppercase">
+                      {item.source} • {item.date && new Date(item.date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="py-10 text-center bg-slate-800/20 rounded-2xl border-2 border-slate-700/50 border-dashed">
+              <p className="text-slate-500 italic font-black uppercase tracking-widest text-[10px]">
+                Aucune actualité marquante dans cette catégorie sur 12 mois.
+              </p>
+            </div>
+          )}
         </section>
       )}
 

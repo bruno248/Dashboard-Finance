@@ -211,29 +211,38 @@ const App: React.FC = () => {
     setNewsLoading(true);
     setLoadingStatus('Actualités...');
     try {
-      const news = await fetchOOHNews(maxCount);
+      const newsItems = await fetchOOHNews(maxCount);
       const now = Date.now();
       
-      setData(prev => {
-        // Déclencher le calcul du sentiment en arrière-plan si le TTL est dépassé
-        if (now - (prev.timestamps.sentiment || 0) > SENTIMENT_TTL) {
-          fetchOOHSentimentFromNews(news).then(sentimentAnalysis => {
-            setData(currentData => ({
-              ...currentData,
-              sentiment: {
-                ...sentimentAnalysis,
-                lastUpdated: new Date().toLocaleString(),
-              },
-              timestamps: { ...currentData.timestamps, sentiment: now }
-            }));
-          }).catch(console.error);
-        }
-        return { ...prev, news, timestamps: { ...prev.timestamps, news: now } };
-      });
+      let sentimentPayload = {};
+      let sentimentTimestamp = {};
+      
+      if (now - (data.timestamps.sentiment || 0) > SENTIMENT_TTL) {
+        setLoadingStatus('Analyse du sentiment...');
+        const sentimentAnalysis = await fetchOOHSentimentFromNews(newsItems);
+        sentimentPayload = {
+          sentiment: {
+            ...sentimentAnalysis,
+            lastUpdated: new Date().toLocaleString(),
+          },
+        };
+        sentimentTimestamp = { sentiment: now };
+      }
 
-    } catch (err) { console.error(err); }
-    finally { setNewsLoading(false); setLoadingStatus(''); }
-  }, []);
+      setData(prev => ({
+        ...prev,
+        news: newsItems,
+        ...sentimentPayload,
+        timestamps: { ...prev.timestamps, news: now, ...sentimentTimestamp }
+      }));
+
+    } catch (err) {
+      console.error("refreshNews failed:", err);
+    } finally {
+      setNewsLoading(false);
+      setLoadingStatus('');
+    }
+  }, [data.timestamps]);
 
   const refreshHighlights = useCallback(async () => {
     setHighlightsLoading(true);

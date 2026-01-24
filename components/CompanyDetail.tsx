@@ -39,6 +39,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany,
         if (companySeries && companySeries.points.length > 1) {
           setHistoryPoints(companySeries.points.map(p => p.price));
         } else {
+          console.warn(`No valid history for ${company.ticker}, using fallback.`);
           const points = range === '1M' ? 30 : range === '6M' ? 60 : 120;
           setHistoryPoints(generateFallbackHistory(company.price, points));
         }
@@ -51,7 +52,9 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ company, onSelectCompany,
       }
     };
 
-    loadHistory();
+    if (company.ticker && company.price > 0) {
+      loadHistory();
+    }
   }, [company.ticker, company.price, range]);
 
   const maxPrice = historyPoints.length > 0 ? Math.max(...historyPoints) * 1.05 : company.price;

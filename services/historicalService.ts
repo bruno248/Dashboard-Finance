@@ -2,15 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { HistoricalPricesPayload, PriceSeries, PricePoint } from "../types";
 import { cleanJsonResponse, withRetry } from "../utils";
-import { COMPANIES } from '../constants';
-
-const STORAGE_KEY = 'ooh_terminal_history_master_v1';
-
-const getStoredHistory = (): Record<string, PricePoint[]> => {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return {};
-  try { return JSON.parse(saved); } catch (e) { return {}; }
-};
 
 const historySchema = {
     type: Type.OBJECT,
@@ -43,65 +34,45 @@ const historySchema = {
 };
 
 export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", tickers: string[]): Promise<HistoricalPricesPayload> => {
-  const master = getStoredHistory();
-  const series: PriceSeries[] = [];
-  const tickersToFetch: string[] = [];
-  const thresholds = { "1M": 10, "3M": 20, "6M": 40, "1Y": 80 };
-  const requiredPoints = thresholds[period];
-
-  tickers.forEach(ticker => {
-    const existing = master[ticker] || [];
-    if (existing.length >= requiredPoints) {
-      const companyInfo = COMPANIES.find(c => c.ticker === ticker);
-      series.push({ 
-        ticker, 
-        name: companyInfo?.name || ticker, 
-        currency: companyInfo?.currency || 'USD', 
-        points: existing.slice(-requiredPoints) 
-      });
-    } else {
-      tickersToFetch.push(ticker);
-    }
-  });
-
-  if (tickersToFetch.length === 0) {
-    return { period, series };
+  if (tickers.length === 0) {
+    return { period, series: [] };
   }
   
+  const pointsCount = { "1M": 4, "3M": 5, "6M": 5, "1Y": 6 };
+  const numPoints = pointsCount[period];
+
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `Get historical daily stock prices for the following tickers: ${tickersToFetch.join(", ")}. The period is the last ${period}. Provide about ${requiredPoints} data points for each.`,
+      model: "gemini-3-flash-preview",
+      contents: `Pour les tickers suivants : ${tickers.join(", ")}, fournis ${numPoints} points de données clés de l'historique des cours sur la période passée de ${period}. 
+      Par exemple, pour '1Y', donne le cours d'aujourd'hui, d'il y a ~1 mois, ~3 mois, ~6 mois, ~9 mois, et ~12 mois. 
+      Inclus toujours le point le plus récent et le plus ancien de la période.`,
       config: { 
         tools: [{ googleSearch: {} }], 
         responseMimeType: "application/json",
         responseSchema: historySchema,
         temperature: 0.2,
-        maxOutputTokens: 4096,
-        thinkingConfig: { thinkingBudget: 2048 },
+        maxOutputTokens: 2048, 
+        thinkingConfig: { thinkingBudget: 512 },
       }
     });
 
     const fetchedData = JSON.parse(cleanJsonResponse(response.text)) as Pick<HistoricalPricesPayload, 'series'>;
     
     if (fetchedData.series && Array.isArray(fetchedData.series)) {
-      const finalSeries = [...series]; // Start with cached data
-      fetchedData.series.forEach(newS => {
-        const pointMap = new Map<string, number>();
-        (master[newS.ticker] || []).forEach(p => pointMap.set(p.date, p.price));
-        newS.points.forEach(p => pointMap.set(p.date, p.price));
-        const merged = Array.from(pointMap.entries()).map(([date, price]) => ({ date, price })).sort((a, b) => a.date.localeCompare(b.date));
-        master[newS.ticker] = merged;
-        finalSeries.push({ ...newS, points: merged.slice(-requiredPoints) });
+      // S'assurer que les points sont triés par date pour chaque série
+      fetchedData.series.forEach(s => {
+        if (s.points && Array.isArray(s.points)) {
+          s.points.sort((a, b) => a.date.localeCompare(b.date));
+        }
       });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(master));
-      return { period, series: finalSeries };
+      return { period, series: fetchedData.series };
     }
     
-    throw new Error("Invalid structure in AI response");
+    throw new Error("Invalid structure in AI response for historical prices");
   }).catch(error => {
     console.error("Failed to fetch historical prices:", error);
-    return { period, series: series }; // Return already found series from cache on failure
+    return { period, series: [] }; // Retourner un tableau vide en cas d'échec
   });
 };

@@ -130,7 +130,14 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
     return fallback;
   }
 
-  const newsTitles = news.slice(0, 20).map(n => `- ${n.title} [${n.tag}]`).join('\n');
+  const MAX_TITLE_LENGTH = 180;
+  const newsTitles = news.slice(0, 10).map(n => {
+    const truncatedTitle = n.title.length > MAX_TITLE_LENGTH 
+      ? `${n.title.substring(0, MAX_TITLE_LENGTH)}...` 
+      : n.title;
+    return `- ${truncatedTitle} [${n.tag}]`;
+  }).join('\n');
+
   const sentimentSchema = {
     type: Type.OBJECT,
     properties: {
@@ -156,7 +163,8 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
         responseMimeType: "application/json",
         responseSchema: sentimentSchema,
         temperature: 0.2,
-        maxOutputTokens: 400,
+        maxOutputTokens: 800,
+        thinkingConfig: { thinkingBudget: 400 },
       }
     });
     const parsed = JSON.parse(cleanJsonResponse(response.text));
