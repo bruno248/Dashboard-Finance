@@ -57,43 +57,43 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 md:pb-10 px-1">
-      <div className="bg-slate-800 rounded-3xl md:rounded-[2rem] border border-slate-700 overflow-hidden shadow-2xl">
-        <div className="p-5 md:p-8 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center bg-slate-800/50 gap-6">
+      <div className="bg-slate-800 rounded-xl md:rounded-[2rem] border border-slate-700 overflow-hidden shadow-2xl">
+        <div className="p-3 md:p-8 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center bg-slate-800/50 gap-4">
           <div className="flex items-center gap-4 md:gap-6">
-            <button onClick={() => changeMonth(-1)} title="Mois précédent" className="p-2 md:p-2.5 bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg text-emerald-400">
+            <button onClick={() => changeMonth(-1)} title="Mois précédent" className="p-2 bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg text-emerald-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
             </button>
             <div className="text-center">
-              <h2 className="text-xl md:text-2xl font-black text-white min-w-[150px] md:min-w-[200px]">{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
+              <h2 className="text-base md:text-2xl font-black text-white min-w-[120px] md:min-w-[200px]">{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
               <p className="text-[9px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">Agenda des publications</p>
             </div>
-            <button onClick={() => changeMonth(1)} title="Mois suivant" className="p-2 md:p-2.5 bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg text-emerald-400">
+            <button onClick={() => changeMonth(1)} title="Mois suivant" className="p-2 bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg text-emerald-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex bg-slate-900 p-1 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner">
-              <button onClick={() => setView('grid')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'grid' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>GRILLE</button>
-              <button onClick={() => setView('list')} className={`px-4 md:px-6 py-1.5 md:py-2.5 text-[9px] md:text-[10px] font-black rounded-lg md:rounded-xl transition-all ${view === 'list' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>LISTE</button>
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 shadow-inner">
+              <button onClick={() => setView('grid')} className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${view === 'grid' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>GRILLE</button>
+              <button onClick={() => setView('list')} className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${view === 'list' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>LISTE</button>
             </div>
           </div>
         </div>
 
-        <div className="p-4 md:p-8">
+        <div className="p-1 md:p-6">
           {view === 'grid' ? (
-            <div className="grid grid-cols-7 gap-px bg-slate-700 border border-slate-700 rounded-xl md:rounded-2xl overflow-hidden">
-              {["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"].map(d => (
-                <div key={d} className="bg-slate-900 py-3 text-center text-[8px] md:text-[10px] font-black text-slate-500 border-b border-slate-700">{d}</div>
+            <div className="grid grid-cols-7 gap-px bg-slate-700 border border-slate-700 rounded-lg md:rounded-2xl overflow-hidden">
+              {["L", "M", "M", "J", "V", "S", "D"].map(d => (
+                <div key={d} className="bg-slate-900 py-2 md:py-3 text-center text-[8px] md:text-[10px] font-black text-slate-500 border-b border-slate-700">{d}</div>
               ))}
               {calendarDays.map((d, i) => (
-                <div key={i} className={`bg-slate-800 p-1.5 md:p-3 min-h-[70px] md:min-h-[110px] flex flex-col gap-1 border border-slate-700/20 ${d.empty ? 'bg-slate-900/40 opacity-10' : ''}`}>
+                <div key={i} className={`bg-slate-800 p-1 md:p-3 min-h-[56px] md:min-h-[110px] flex flex-col gap-1 border border-slate-700/20 ${d.empty ? 'bg-slate-900/40 opacity-10' : ''}`}>
                   {!d.empty && (
                     <>
                       <span className={`text-[9px] md:text-xs font-black ${d.events && d.events.length > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>{d.day}</span>
                       <div className="flex flex-col gap-1 overflow-hidden">
                         {d.events?.map((e, idx) => (
-                          <div key={idx} title={e.title} className={`rounded p-1 text-[6px] md:text-[8px] font-black leading-tight truncate ${isImminent(e.date) ? 'bg-emerald-500 text-slate-900' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                          <div key={idx} title={e.title} className={`rounded p-1 text-[7px] md:text-[8px] font-black leading-tight truncate ${isImminent(e.date) ? 'bg-emerald-500 text-slate-900' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                             {e.title}
                           </div>
                         ))}
@@ -104,7 +104,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2 md:space-y-3 p-1 md:p-0">
               {futureEvents.length > 0 ? (
                 futureEvents.map((ev, idx) => {
                   const evDate = new Date(ev.date);
@@ -113,8 +113,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
                   const imminent = isImminent(ev.date);
 
                   return (
-                    <div key={idx} className="flex items-center gap-4 md:gap-6 p-4 md:p-6 bg-slate-900/50 rounded-2xl md:rounded-3xl border border-slate-700 hover:border-emerald-500/30 transition-all group shadow-xl">
-                      <div className={`flex flex-col w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl border overflow-hidden shadow-lg flex-shrink-0 transition-transform group-hover:scale-105 ${imminent ? 'border-emerald-500' : 'border-slate-700'}`}>
+                    <div key={idx} className="flex items-center gap-4 p-2 md:p-6 bg-slate-900/50 rounded-lg md:rounded-3xl border border-slate-700 hover:border-emerald-500/30 transition-all group shadow-xl">
+                      <div className={`flex flex-col w-10 h-10 md:w-16 md:h-16 rounded-md md:rounded-2xl border overflow-hidden shadow-lg flex-shrink-0 transition-transform group-hover:scale-105 ${imminent ? 'border-emerald-500' : 'border-slate-700'}`}>
                         <div className={`h-1/3 w-full flex items-center justify-center text-[7px] md:text-[10px] font-black tracking-widest ${imminent ? 'bg-emerald-500 text-slate-900' : 'bg-slate-700 text-slate-400'}`}>
                           {month}
                         </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DocumentItem, SectorData } from '../types';
 
 interface DocumentsPageProps {
@@ -10,28 +10,36 @@ interface DocumentsPageProps {
 
 const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) => {
   const companies = useMemo(() => 
-    data?.companies.map(c => c.ticker).filter(Boolean) as string[] || ['DEC.PA', 'LAMR', 'OUT', 'SAX.DE', 'CCO'], 
+    data?.companies.map(c => c.ticker).filter(Boolean) as string[] ?? [], 
     [data?.companies]
   );
   
-  const [selectedTicker, setSelectedTicker] = useState<string>(companies[0] || 'DEC.PA');
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedTicker && companies.length > 0) {
+      setSelectedTicker(companies[0]);
+    }
+    if (selectedTicker && !companies.includes(selectedTicker)) {
+      setSelectedTicker(companies.length > 0 ? companies[0] : null);
+    }
+  }, [companies, selectedTicker]);
 
   const currentDocs = useMemo(() => {
-    if (!data?.companyDocuments) return [];
-    // La clé est maintenant normalisée par le service, une recherche directe suffit.
+    if (!data?.companyDocuments || !selectedTicker) return [];
     return data.companyDocuments[selectedTicker.toUpperCase()] || [];
   }, [data?.companyDocuments, selectedTicker]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <aside className="w-full lg:w-72 space-y-4">
+    <div className="flex flex-col lg:flex-row gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <aside className="w-full lg:w-72 space-y-4 lg:flex-shrink-0">
         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2 mb-4">Filtrer par société</h3>
         <div className="space-y-2">
           {companies.map(ticker => (
             <button
               key={ticker}
               onClick={() => setSelectedTicker(ticker)}
-              className={`w-full text-left px-5 py-4 rounded-2xl text-xs font-black transition-all border flex items-center justify-between group ${
+              className={`w-full text-left px-3 py-2 md:px-5 md:py-4 rounded-lg md:rounded-2xl text-xs font-black transition-all border flex items-center justify-between group ${
                 selectedTicker === ticker 
                   ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl shadow-emerald-900/20' 
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200 shadow-md'
@@ -45,10 +53,10 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
       </aside>
 
       <div className="flex-1 space-y-6">
-        <div className="flex items-center justify-between p-8 bg-slate-800/50 rounded-[2rem] border border-slate-700 backdrop-blur-sm shadow-2xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-8 bg-slate-800/50 rounded-xl md:rounded-2xl border border-slate-700 md:backdrop-blur-sm shadow-2xl gap-4">
           <div className="flex-1">
-            <h2 className="text-2xl font-black text-white">Base Documentaire : {selectedTicker}</h2>
-            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Accès aux rapports institutionnels extraits en temps réel</p>
+            <h2 className="text-base md:text-2xl font-black text-white">Base Doc : {selectedTicker || '...'}</h2>
+            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Rapports institutionnels</p>
           </div>
           <div className="flex items-center gap-4">
              <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 shadow-inner whitespace-nowrap">
@@ -57,7 +65,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {currentDocs.length > 0 ? (
             currentDocs.map((doc, idx) => (
               <a 
@@ -65,7 +73,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
                 href={doc.url || '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="bg-slate-800 p-8 rounded-[2.5rem] border border-slate-700 hover:border-emerald-500/50 transition-all flex flex-col group shadow-xl hover:-translate-y-1 relative overflow-hidden"
+                className="bg-slate-800 p-4 md:p-8 rounded-xl md:rounded-[2.5rem] border border-slate-700 hover:border-emerald-500/50 transition-all flex flex-col group shadow-xl hover:-translate-y-1 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                    <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" /></svg>
@@ -80,7 +88,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
                   </div>
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{doc.date}</span>
                 </div>
-                <h4 className="text-xl font-bold text-slate-100 group-hover:text-emerald-400 transition-colors mb-4 line-clamp-2 leading-snug">{doc.title}</h4>
+                <h4 className="text-sm md:text-xl font-bold text-slate-100 group-hover:text-emerald-400 transition-colors mb-4 line-clamp-2 leading-snug">{doc.title}</h4>
                 <div className="mt-auto pt-6 border-t border-slate-700/50 flex items-center justify-between">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Source: {selectedTicker}</span>
                   <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black opacity-0 group-hover:opacity-100 transition-all uppercase tracking-widest">
@@ -91,7 +99,7 @@ const DocumentsPage: React.FC<DocumentsPageProps> = ({ docs, data, loading }) =>
               </a>
             ))
           ) : (
-            <div className="col-span-full py-24 text-center bg-slate-800/30 rounded-[3rem] border-2 border-slate-700 border-dashed shadow-inner">
+            <div className="col-span-full py-16 md:py-24 text-center bg-slate-800/30 rounded-2xl md:rounded-[3rem] border-2 border-slate-700 border-dashed shadow-inner">
               <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-slate-700 shadow-2xl">
                 <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               </div>

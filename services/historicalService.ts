@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { HistoricalPricesPayload, PriceSeries, PricePoint } from "../types";
-import { cleanJsonResponse, withRetry } from "../utils";
+import { cleanJsonResponse, withRetry, createGenAIInstance } from "../utils";
 
 const historySchema = {
     type: Type.OBJECT,
@@ -42,7 +42,7 @@ export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", t
   const numPoints = pointsCount[period];
 
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Pour les tickers suivants : ${tickers.join(", ")}, fournis ${numPoints} points de données clés de l'historique des cours sur la période passée de ${period}. 

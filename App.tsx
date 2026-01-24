@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardOverview from './components/DashboardOverview';
@@ -10,16 +10,17 @@ import DocumentsPage from './components/DocumentsPage';
 import CalendarPage from './components/CalendarPage';
 import SourcesPage from './components/SourcesPage';
 import ScreenerPage from './components/ScreenerPage';
-import { Company, SectorData, AnalystRating, NewsItem } from './types';
+import { Company, SectorData, AnalystRating, NewsItem, RawCompanyFromAI } from './types';
 import { COMPANIES, NEWS, EVENTS, DOCUMENTS } from './constants';
 import { fetchRealTimeOOHData, fetchOOHQuotes, fetchOOHRatings, fetchOOHTargetPrices, FALLBACK_COMPANIES } from './services/aiService';
 import { fetchOOHNews, fetchOOHHighlights, fetchOOHSentimentFromNews } from './services/newsService';
 import { fetchOOHDocuments } from './services/documentService';
 import { fetchOOHAgenda } from './services/agendaService';
-import { parseFinancialValue, calculateEV } from './utils';
+import { computeFinancialRatios, formatAge } from './utils';
 
 const CACHE_KEY = 'ooh_insight_v28_persistence';
 const FINANCIALS_TTL = 5 * 60 * 1000;
+const FUNDAMENTALS_TTL = 60 * 60 * 1000; // 1 heure
 const NEWS_TTL = 15 * 60 * 1000;
 const SENTIMENT_TTL = 2 * 60 * 60 * 1000; // 2 heures
 const DOCS_TTL = 120 * 60 * 1000;
@@ -44,289 +45,250 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const companiesFromStorage = parsed.companies?.length > 0 ? parsed.companies : COMPANIES;
+
+        const repairedCompanies = companiesFromStorage.map(comp => {
+          const fallbackData = FALLBACK_COMPANIES.find(fb => fb.ticker === comp.ticker);
+          let baseData = { ...comp };
+
+          if (fallbackData) {
+            const withFallback = { ...baseData, ...fallbackData };
+            withFallback.price = baseData.price;
+            withFallback.change = baseData.change;
+            baseData = withFallback;
+          }
+          
+          const ratios = computeFinancialRatios(baseData);
+          return { ...baseData, ...ratios };
+        });
+
         return { 
           ...parsed, 
-          companies: parsed.companies?.length > 0 ? parsed.companies : COMPANIES, 
-          timestamps: parsed.timestamps || {} 
+          companies: repairedCompanies, 
+          timestamps: parsed.timestamps || {},
+          aiStatus: parsed.aiStatus || { lastSuccess: null, lastError: null },
         };
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Could not parse saved data, re-initializing.", e); }
     }
     
-    // Si pas de cache, enrichir les constantes avec les données de fallback
-    const enrichedCompanies = COMPANIES.map(comp => {
-      const fallbackData = FALLBACK_COMPANIES.find(fb => fb.ticker === comp.ticker);
-      // Fusionne, en s'assurant que les données de marché du fallback (prix, etc.) ne sont pas utilisées
-      return fallbackData ? { ...comp, ...fallbackData, price: 0, change: 0, marketCap: '--' } : comp;
+    // Si pas de cache, `COMPANIES` est maintenant la source de vérité complète.
+    const initialCompanies = COMPANIES.map(comp => {
+      const ratios = computeFinancialRatios(comp);
+      // On s'assure que price & change sont à 0 au démarrage
+      return { ...comp, ...ratios, price: 0, change: 0 };
     });
 
-    return { companies: enrichedCompanies, news: NEWS, highlights: [], events: EVENTS, documents: DOCUMENTS, companyDocuments: {}, analysis: "", marketOpportunities: [], marketRisks: [], lastUpdated: 'Initialisation...', timestamps: {} };
+    return { companies: initialCompanies, news: NEWS, highlights: [], events: EVENTS, documents: DOCUMENTS, companyDocuments: {}, analysis: "", marketOpportunities: [], marketRisks: [], lastUpdated: 'Initialisation...', timestamps: {}, aiStatus: { lastSuccess: null, lastError: null } };
   });
+
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   useEffect(() => {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
   }, [data]);
 
+  const handleAiSuccess = useCallback(() => {
+    setData(prev => ({ ...prev, aiStatus: { ...prev.aiStatus, lastSuccess: Date.now() } }));
+  }, []);
+
+  const handleAiError = useCallback(() => {
+    setData(prev => ({ ...prev, aiStatus: { ...prev.aiStatus, lastError: Date.now() } }));
+  }, []);
+
   const refreshFinancials = useCallback(async () => {
-    // NOTE: Le rendement du dividende (yield) est calculé localement à partir du cours
-    // et du dividende par action (DPS), il n'est pas extrait directement depuis l'IA.
     setFinancialLoading(true);
     setLoadingStatus('Synchro des cours...');
     try {
       const tickers = data.companies.map(c => c.ticker).filter(Boolean) as string[];
       const quotes = await fetchOOHQuotes(tickers);
+      handleAiSuccess();
       
       setData(prev => {
         const updatedCompanies = prev.companies.map(base => {
           const quote = quotes.find(q => q.ticker.toUpperCase() === base.ticker?.toUpperCase());
-          if (!quote || !base.sharesOutstanding) return base;
-
-          const mkt = quote.price * base.sharesOutstanding;
-          const debt = parseFinancialValue(base.netDebt);
-          const ev = calculateEV(mkt, debt);
-
-          const getV = (val: any) => parseFinancialValue(val);
-          const r24 = getV(base.revenue2024), r25 = getV(base.revenue2025), r26 = getV(base.revenue2026);
-          const eb24 = getV(base.ebitda2024), eb25 = getV(base.ebitda2025), eb26 = getV(base.ebitda2026);
-          const ebit24 = getV(base.ebit2024), ebit25 = getV(base.ebit2025), ebit26 = getV(base.ebit2026);
-          const inc24 = getV(base.netIncome2024), inc25 = getV(base.netIncome2025), inc26 = getV(base.netIncome2026);
-          const cap24 = getV(base.capex2024), cap25 = getV(base.capex2025), cap26 = getV(base.capex2026);
-          const dps24 = getV(base.dividendPerShare2024), dps25 = getV(base.dividendPerShare2025), dps26 = getV(base.dividendPerShare2026);
-
-          const div = (n: number, d: number) => (d > 0 ? n / d : 0);
-          const price = quote.price;
-          const yield24 = div(dps24, price) * 100, yield25 = div(dps25, price) * 100, yield26 = div(dps26, price) * 100;
-
-          return {
-            ...base,
-            price: quote.price,
-            change: quote.change,
-            marketCap: `${mkt.toFixed(0)} M`,
-            ev: `${ev.toFixed(0)} M`,
-            dividendYield: yield24 > 0 ? `${yield24.toFixed(1)}%` : '--',
-            dividendYieldNumeric: yield24,
-            dividendYield2025: yield25 > 0 ? `${yield25.toFixed(1)}%` : '--',
-            dividendYield2025Numeric: yield25,
-            dividendYield2026: yield26 > 0 ? `${yield26.toFixed(1)}%` : '--',
-            dividendYield2026Numeric: yield26,
-            ebitdaMargin: eb24 > 0 && r24 > 0 ? (eb24 / r24) * 100 : (base.ebitdaMargin || 0),
-            evEbitda: div(ev, eb24), evEbitdaForward: div(ev, eb25), evEbitdaNext: div(ev, eb26),
-            evEbit: div(ev, ebit24), evEbitForward: div(ev, ebit25), evEbitNext: div(ev, ebit26),
-            evSales: div(ev, r24), evSalesForward: div(ev, r25), evSalesNext: div(ev, r26),
-            per: div(mkt, inc24), perForward: div(mkt, inc25), perNext: div(mkt, inc26),
-            evEbitdaCapex: div(ev, (eb24 - cap24)), evEbitdaCapexForward: div(ev, (eb25 - cap25)), evEbitdaCapexNext: div(ev, (eb26 - cap26)),
-          };
+          if (!quote) return base;
+          const updatedCompanyData = { ...base, price: quote.price, change: quote.change };
+          const ratios = computeFinancialRatios(updatedCompanyData);
+          return { ...updatedCompanyData, ...ratios };
         });
-        return {
-          ...prev,
-          companies: updatedCompanies,
-          lastUpdated: new Date().toLocaleString(),
-          timestamps: { ...prev.timestamps, financials: Date.now() }
-        };
+
+        return { ...prev, companies: updatedCompanies, lastUpdated: new Date().toLocaleString(), timestamps: { ...prev.timestamps, financials: Date.now() } };
       });
-    } catch(err) { console.error(err); }
+    } catch(err) { console.error(err); handleAiError(); }
     finally { setFinancialLoading(false); setLoadingStatus(''); }
-  }, [data.companies]);
+  }, [data.companies, handleAiSuccess, handleAiError]);
 
   const refreshFundamentals = useCallback(async (targetTickers?: string[]) => {
     setFinancialLoading(true);
     const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
     const now = Date.now();
     
-    setLoadingStatus('Synchro des objectifs de cours...');
-    const targetsResult = await fetchOOHTargetPrices(tickers);
-    
-    let ratingsResult: { ticker: string; rating: AnalystRating }[] = [];
-    if (now - (data.timestamps?.ratings || 0) > RATINGS_TTL) {
-        setLoadingStatus('Synchro des ratings...');
-        ratingsResult = await fetchOOHRatings(tickers);
-    }
-
-    setLoadingStatus('Synchro des fondamentaux...');
     try {
+      setLoadingStatus('Synchro des objectifs de cours...');
+      const targetsResult = await fetchOOHTargetPrices(tickers);
+      handleAiSuccess();
+      
+      let ratingsResult: { ticker: string; rating: AnalystRating }[] = [];
+      if (now - (data.timestamps?.ratings || 0) > RATINGS_TTL) {
+          setLoadingStatus('Synchro des ratings...');
+          ratingsResult = await fetchOOHRatings(tickers);
+          handleAiSuccess();
+      }
+
+      setLoadingStatus('Synchro des fondamentaux...');
       const syncResult = await fetchRealTimeOOHData(tickers);
+      handleAiSuccess();
       
       setData(prev => {
         const merged = prev.companies.map(base => {
-          const u = syncResult.companies.find((x: any) => x.ticker.toUpperCase() === base.ticker?.toUpperCase());
+          const fallbackData = FALLBACK_COMPANIES.find(fb => fb.ticker === base.ticker) || {};
+          const rawData = syncResult.companies.find((x: RawCompanyFromAI) => x.ticker.toUpperCase() === base.ticker?.toUpperCase());
           const newRatingData = ratingsResult.find(r => r.ticker.toUpperCase() === base.ticker?.toUpperCase());
           const newTargetData = targetsResult.find(t => t.ticker.toUpperCase() === base.ticker?.toUpperCase());
           
-          const companyData = u ? { ...base, ...u } : { ...base };
-          if (newRatingData) companyData.rating = newRatingData.rating;
-          if (newTargetData && newTargetData.targetPrice !== null) {
-            companyData.targetPrice = newTargetData.targetPrice;
+          // Start with a full set of fallback data, layer current state, then layer new AI data.
+          // This prevents null/undefined from AI from erasing existing valid data.
+          let updatedCompanyData = { ...fallbackData, ...base };
+
+          if (rawData) {
+            const definedRawData = Object.fromEntries(
+              Object.entries(rawData).filter(([_, value]) => value !== null && value !== undefined)
+            );
+            updatedCompanyData = { ...updatedCompanyData, ...definedRawData };
           }
-          if (!u) return companyData;
-
-          const mkt = u.price * u.sharesOutstanding;
-          const debt = parseFinancialValue(u.netDebt);
-          const ev = calculateEV(mkt, debt);
           
-          const getV = (val: any) => parseFinancialValue(val);
-          const r24 = getV(u.revenue2024), r25 = getV(u.revenue2025), r26 = getV(u.revenue2026);
-          const eb24 = getV(u.ebitda2024), eb25 = getV(u.ebitda2025), eb26 = getV(u.ebitda2026);
-          const ebit24 = getV(u.ebit2024), ebit25 = getV(u.ebit2025), ebit26 = getV(u.ebit2026);
-          const inc24 = getV(u.netIncome2024), inc25 = getV(u.netIncome2025), inc26 = getV(u.netIncome2026);
-          const cap24 = getV(u.capex2024), cap25 = getV(u.capex2025), cap26 = getV(u.capex2026);
-          const dps24 = getV(u.dividendPerShare2024), dps25 = getV(u.dividendPerShare2025), dps26 = getV(u.dividendPerShare2026);
+          if (newRatingData) {
+            updatedCompanyData.rating = newRatingData.rating;
+          }
+          if (newTargetData && newTargetData.targetPrice !== null) {
+            updatedCompanyData.targetPrice = newTargetData.targetPrice;
+          }
 
-          const div = (n: number, d: number) => (d > 0 ? n / d : 0);
-          const price = u.price;
-          const yield24 = div(dps24, price) * 100, yield25 = div(dps25, price) * 100, yield26 = div(dps26, price) * 100;
-          
-          return { 
-            ...companyData, 
-            marketCap: `${mkt.toFixed(0)} M`,
-            ev: ev > 0 ? `${ev.toFixed(0)} M` : companyData.ev,
-            dividendYield: yield24 > 0 ? `${yield24.toFixed(1)}%` : '--',
-            dividendYieldNumeric: yield24,
-            dividendYield2025: yield25 > 0 ? `${yield25.toFixed(1)}%` : '--',
-            dividendYield2025Numeric: yield25,
-            dividendYield2026: yield26 > 0 ? `${yield26.toFixed(1)}%` : '--',
-            dividendYield2026Numeric: yield26,
-            evEbitda: div(ev, eb24), evEbitdaForward: div(ev, eb25), evEbitdaNext: div(ev, eb26),
-            evEbit: div(ev, ebit24), evEbitForward: div(ev, ebit25), evEbitNext: div(ev, ebit26),
-            evSales: div(ev, r24), evSalesForward: div(ev, r25), evSalesNext: div(ev, r26),
-            per: div(mkt, inc24), perForward: div(mkt, inc25), perNext: div(mkt, inc26),
-            evEbitdaCapex: div(ev, (eb24 - cap24)), evEbitdaCapexForward: div(ev, (eb25 - cap25)), evEbitdaCapexNext: div(ev, (eb26 - cap26)),
-            ebitdaMargin: eb24 > 0 && r24 > 0 ? (eb24 / r24) * 100 : 0,
-          };
+          const ratios = computeFinancialRatios(updatedCompanyData);
+
+          return { ...updatedCompanyData, ...ratios };
         });
-
         const newTimestamps: Record<string, number> = { ...prev.timestamps, financials: Date.now(), fundamentals: Date.now() };
         if (ratingsResult.length > 0) newTimestamps.ratings = Date.now();
-
-        return { 
-          ...prev, 
-          companies: merged, 
-          lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), 
-          timestamps: newTimestamps 
-        };
+        return { ...prev, companies: merged, lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), timestamps: newTimestamps };
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); handleAiError(); }
     finally { setFinancialLoading(false); setLoadingStatus(''); }
-  }, [data.companies, data.timestamps]);
+  }, [data.companies, data.timestamps, handleAiSuccess, handleAiError]);
 
   const refreshNews = useCallback(async (maxCount: number = 5) => {
+    console.log('refreshNews called with maxCount:', maxCount);
     setNewsLoading(true);
     setLoadingStatus('Actualités...');
     try {
       const newsItems = await fetchOOHNews(maxCount);
+      handleAiSuccess();
       const now = Date.now();
+      let sentimentPayload = {}, sentimentTimestamp = {};
       
-      let sentimentPayload = {};
-      let sentimentTimestamp = {};
-      
-      if (now - (data.timestamps.sentiment || 0) > SENTIMENT_TTL) {
+      if (now - (dataRef.current.timestamps.sentiment || 0) > SENTIMENT_TTL) {
         setLoadingStatus('Analyse du sentiment...');
         const sentimentAnalysis = await fetchOOHSentimentFromNews(newsItems);
-        sentimentPayload = {
-          sentiment: {
-            ...sentimentAnalysis,
-            lastUpdated: new Date().toLocaleString(),
-          },
-        };
+        handleAiSuccess();
+        sentimentPayload = { sentiment: { ...sentimentAnalysis, lastUpdated: new Date().toLocaleString() } };
         sentimentTimestamp = { sentiment: now };
       }
-
-      setData(prev => ({
-        ...prev,
-        news: newsItems,
-        ...sentimentPayload,
-        timestamps: { ...prev.timestamps, news: now, ...sentimentTimestamp }
-      }));
-
-    } catch (err) {
-      console.error("refreshNews failed:", err);
-    } finally {
-      setNewsLoading(false);
-      setLoadingStatus('');
-    }
-  }, [data.timestamps]);
+      setData(prev => ({ ...prev, news: newsItems, ...sentimentPayload, timestamps: { ...prev.timestamps, news: now, ...sentimentTimestamp } }));
+    } catch (err) { console.error("refreshNews failed:", err); handleAiError(); } 
+    finally { setNewsLoading(false); setLoadingStatus(''); }
+  }, [handleAiSuccess, handleAiError]);
 
   const refreshHighlights = useCallback(async () => {
     setHighlightsLoading(true);
     setLoadingStatus('Faits marquants...');
     try {
       const highlights = await fetchOOHHighlights();
+      handleAiSuccess();
       setData(prev => ({ ...prev, highlights, timestamps: { ...prev.timestamps, highlights: Date.now() } }));
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); handleAiError(); }
     finally { setHighlightsLoading(false); setLoadingStatus(''); }
-  }, []);
+  }, [handleAiSuccess, handleAiError]);
 
   const refreshDocs = useCallback(async () => {
     setDocsLoading(true);
     setLoadingStatus('Documents...');
     try {
-      const docsMap = await fetchOOHDocuments();
+      const tickers = dataRef.current.companies.map(c => c.ticker).filter(Boolean) as string[];
+      if (tickers.length === 0) {
+        setDocsLoading(false);
+        return;
+      }
+      const docsMap = await fetchOOHDocuments(tickers);
+      handleAiSuccess();
       setData(prev => ({ ...prev, companyDocuments: { ...prev.companyDocuments, ...docsMap }, timestamps: { ...prev.timestamps, docs: Date.now() } }));
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); handleAiError(); }
     finally { setDocsLoading(false); setLoadingStatus(''); }
-  }, []);
+  }, [handleAiSuccess, handleAiError]);
 
   const refreshCalendar = useCallback(async () => {
+    console.log('refreshCalendar called.');
     setCalendarLoading(true);
     setLoadingStatus('Agenda...');
     try {
       const events = await fetchOOHAgenda();
+      handleAiSuccess();
       setData(prev => ({ ...prev, events, timestamps: { ...prev.timestamps, calendar: Date.now() } }));
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); handleAiError(); }
     finally { setCalendarLoading(false); setLoadingStatus(''); }
-  }, []);
+  }, [handleAiSuccess, handleAiError]);
 
   const handleAddTicker = useCallback((ticker: string) => {
     return refreshFundamentals([ticker]);
   }, [refreshFundamentals]);
 
   useEffect(() => {
+    console.log('App Mounted: Checking for initial data refresh.');
     const now = Date.now();
+    
     if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) {
+      console.log('Financials TTL expired, calling refreshFinancials()');
       refreshFinancials();
     }
-    const delayedFetches = setTimeout(() => {
-      if (now - (data.timestamps?.news || 0) > NEWS_TTL) refreshNews();
-    }, 2500);
-    return () => clearTimeout(delayedFetches);
+    
+    if (now - (data.timestamps?.news || 0) > NEWS_TTL) {
+      console.log('News TTL expired, calling refreshNews()');
+      refreshNews();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleTabChange = useCallback((tab: 'overview' | 'news' | 'analysis' | 'docs' | 'calendar' | 'sources' | 'screener') => {
     setSelectedCompany(null);
     setActiveTab(tab);
-    const now = Date.now();
-    if (tab === 'news' && (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL)) refreshHighlights();
-    if (tab === 'docs' && (now - (data.timestamps?.docs || 0) > DOCS_TTL)) refreshDocs();
-    if (tab === 'calendar' && (now - (data.timestamps?.calendar || 0) > CALENDAR_TTL)) refreshCalendar();
-  }, [data.timestamps, refreshDocs, refreshCalendar, refreshHighlights]);
+  }, []);
 
   const handleGlobalRefresh = useCallback(() => {
     if (selectedCompany) {
-      refreshFinancials(); // Refresh léger pour la vue détaillée aussi
+      refreshFinancials();
       return;
     }
     switch (activeTab) {
-      case 'sources':
-        refreshFundamentals(); // Synchro lourde uniquement depuis la page "Data"
-        break;
-      case 'news':
-        refreshNews(20);
-        refreshHighlights();
-        break;
-      case 'docs':
-        refreshDocs();
-        break;
-      case 'calendar':
-        refreshCalendar();
-        break;
-      default:
-        refreshFinancials(); // Rafraîchissement léger pour toutes les autres pages
-        break;
+      case 'sources': refreshFundamentals(); break;
+      case 'news': refreshNews(20); refreshHighlights(); break;
+      case 'docs': refreshDocs(); break;
+      case 'calendar': refreshCalendar(); break;
+      default: refreshFinancials(); break;
     }
   }, [activeTab, selectedCompany, refreshFinancials, refreshFundamentals, refreshNews, refreshHighlights, refreshDocs, refreshCalendar]);
 
   const handleSelectCompany = useCallback((company: Company) => {
     setSelectedCompany(company);
   }, []);
+
+  const dataAges = useMemo(() => ({
+    financials: formatAge(data.timestamps.financials),
+    news: formatAge(data.timestamps.news),
+    calendar: formatAge(data.timestamps.calendar),
+    docs: formatAge(data.timestamps.docs),
+  }), [data.timestamps]);
 
   const renderContent = () => {
     if (selectedCompany) return <CompanyDetail company={selectedCompany} peers={data.companies as Company[]} onSelectCompany={handleSelectCompany} />;
@@ -346,7 +308,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-900 text-slate-50 overflow-x-hidden">
-      <Sidebar activeTab={selectedCompany ? '' : activeTab} setActiveTab={handleTabChange} />
+      <Sidebar activeTab={selectedCompany ? '' : activeTab} setActiveTab={handleTabChange} aiStatus={data.aiStatus} />
       <main className="flex-1 md:ml-60 flex flex-col p-4 md:p-8 relative">
         <Header 
           title={selectedCompany ? selectedCompany.name : "OOH Terminal"} 
@@ -354,6 +316,7 @@ const App: React.FC = () => {
           onBack={selectedCompany ? () => setSelectedCompany(null) : undefined} 
           onRefresh={handleGlobalRefresh} 
           loading={isCurrentViewLoading}
+          dataAges={dataAges}
           onScreenerClick={() => {
             setActiveTab('screener');
             setSelectedCompany(null);

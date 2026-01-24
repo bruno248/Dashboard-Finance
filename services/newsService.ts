@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { NewsItem, NewsTag } from "../types";
-import { cleanJsonResponse, withRetry } from "../utils";
+import { cleanJsonResponse, withRetry, createGenAIInstance } from "../utils";
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -48,17 +48,22 @@ const highlightsSchema = {
 
 export const fetchOOHNews = async (maxCount: number = 5): Promise<NewsItem[]> => {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Changed to Flash for stability
+      model: "gemini-3-flash-preview",
       contents: `
-Récupère jusqu'à ${maxCount} actualités publiées dans les 3 DERNIERS JOURS 
-sur le secteur de la communication extérieure (OOH), notamment sur JCDecaux, Lamar, Ströer, Clear Channel, Outfront.
+En tant qu'analyste financier, trouve jusqu'à ${maxCount} actualités pertinentes publiées au cours des 7 derniers jours sur le secteur de la communication extérieure (OOH).
 
-Contraintes fortes :
-- La date DOIT être renvoyée au format "YYYY-MM-DD" et être identifiable.
-- Pour chaque news, choisis un tag parmi : ${simplifiedTagsDescription}.
-- Le résultat doit respecter strictement le schema JSON fourni. Les champs optionnels comme 'url' ou 'time' peuvent être omis si non pertinents.`,
+**Stratégie de recherche :**
+1.  **Sociétés clés** : Recherche des actualités sur JCDecaux, Lamar, Ströer, Clear Channel, Outfront Media.
+2.  **Thèmes généraux** : Élargis la recherche à des termes comme "DOOH", "digital billboards", "outdoor advertising market".
+3.  **Qualité avant tout** : Ton objectif principal est de renvoyer des articles réels et vérifiables. Il est acceptable de retourner moins de ${maxCount} articles si la recherche n'est pas fructueuse. N'invente jamais de news.
+
+**Règles de formatage JSON impératives (la requête échouera si non respectées) :**
+- **Format JSON strict** : La réponse doit être un objet JSON valide qui respecte le schéma.
+- **Échappement OBLIGATOIRE des guillemets** : Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés (par ex. \`"title": "Une news sur \\"Big News\\" Inc."\`).
+- **Cas vide** : Si aucune actualité n'est trouvée, renvoyer \`{"news": []}\`.
+- **Tags valides** : Le tag doit être l'un des suivants : ${simplifiedTagsDescription}.`,
       config: { 
         tools: [{ googleSearch: {} }], 
         responseMimeType: "application/json",
@@ -68,6 +73,7 @@ Contraintes fortes :
         thinkingConfig: { thinkingBudget: maxCount === 5 ? 512 : 1024 },
       }
     });
+    console.log('IA response for news:', response.text);
     const parsed = JSON.parse(cleanJsonResponse(response.text));
     return parsed.news || FALLBACK_NEWS;
   }).catch((error) => {
@@ -78,19 +84,23 @@ Contraintes fortes :
 
 export const fetchOOHHighlights = async (): Promise<NewsItem[]> => {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Changed to Flash for stability
+      model: "gemini-3-flash-preview", 
       contents: `
 Récupère 10 à 15 actualités MARQUANTES publiées au cours des 12 DERNIERS MOIS 
 sur le secteur de la communication extérieure (OOH).
 
-Contraintes fortes :
+**Contraintes fortes :**
 - Ne sélectionne que des événements significatifs (M&A majeur, résultats annuels, changement de direction, innovation technologique importante).
 - La date DOIT être renvoyée au format "YYYY-MM-DD".
 - Le champ 'time' (temps relatif) est optionnel ; utiliser une chaîne vide si non applicable.
-- Pour chaque news, choisis un tag parmi : ${simplifiedTagsDescription}.
-- La réponse DOIT être un JSON valide respectant strictement le schéma fourni.`,
+
+**Règles de formatage JSON impératives :**
+- **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma.
+- **Échappement OBLIGATOIRE des guillemets** : Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés (ex: \`"title": "Un titre avec des \\"guillemets\\""\`).
+- **Tags valides** : Le tag doit être l'un des suivants : ${simplifiedTagsDescription}.
+- **Cas vide** : Si rien n'est trouvé, retourner \`{"highlights": []}\`.`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -110,7 +120,7 @@ Contraintes fortes :
 
 export const summarizeNewsItem = async (title: string, source: string): Promise<string> => {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyse cette news OOH : "${title}" (${source}). Résumé court + 3 points clés en français. Sépare les points clés avec le titre "KEY TAKEAWAYS".`,
@@ -135,7 +145,11 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
     const truncatedTitle = n.title.length > MAX_TITLE_LENGTH 
       ? `${n.title.substring(0, MAX_TITLE_LENGTH)}...` 
       : n.title;
-    return `- ${truncatedTitle} [${n.tag}]`;
+    const sanitizedTitle = truncatedTitle
+      .replace(/\\/g, '\\\\') 
+      .replace(/"/g, '\\"')   
+      .replace(/\n/g, ' ');  
+    return `- ${sanitizedTitle} [${n.tag}]`;
   }).join('\n');
 
   const sentimentSchema = {
@@ -153,28 +167,50 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
     propertyOrdering: ["label", "description", "keyTakeaways"],
   };
 
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `En tant qu'analyste financier, analyse ces titres d'actualités du secteur OOH:\n${newsTitles}\n\nQuel est le sentiment de marché global qui s'en dégage ? Fournis aussi 2-3 points clés à retenir. Réponds en français. La réponse DOIT être un JSON valide respectant strictement le schéma, utilisant des guillemets doubles pour les clés et les chaînes.`,
+      contents: `En tant qu'analyste financier, analyse ces titres d'actualités du secteur OOH:\n${newsTitles}\n\nQuel est le sentiment de marché global qui s'en dégage ? Fournis aussi 2-3 points clés à retenir. Réponds en français.
+
+**RÈGLES IMPÉRATIVES DE FORMATAGE JSON (la requête échouera si non respectées) :**
+1.  La réponse DOIT être un objet JSON valide respectant strictement le schéma fourni.
+2.  **Échappement OBLIGATOIRE des guillemets** : TOUS les guillemets (") que tu utilises à l'intérieur des valeurs de chaîne de caractères (par exemple dans les champs 'description' ou 'keyTakeaways') DOIVENT impérativement être échappés avec un backslash (\\).
+    -   **Exemple correct :** \`{"description": "L'analyste a déclaré : \\"C'est une bonne nouvelle pour le secteur.\\""}\`
+    -   **Exemple INCORRECT :** \`{"description": "L'analyste a déclaré : "C'est une bonne nouvelle pour le secteur.""}\`
+3.  N'ajoute aucun commentaire ou texte en dehors de l'objet JSON final.`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: sentimentSchema,
         temperature: 0.2,
-        maxOutputTokens: 800,
+        maxOutputTokens: 1200,
         thinkingConfig: { thinkingBudget: 400 },
       }
     });
-    const parsed = JSON.parse(cleanJsonResponse(response.text));
-    return parsed || { ...fallback, label: "Analyse Indisponible" };
-  }).catch((error) => {
-    console.error("fetchOOHSentimentFromNews failed:", error);
+    
+    const rawResponseText = response.text;
+    try {
+      const parsed = JSON.parse(cleanJsonResponse(rawResponseText));
+      if (parsed && parsed.label && parsed.description && Array.isArray(parsed.keyTakeaways)) {
+          return parsed;
+      }
+      console.warn("fetchOOHSentimentFromNews - JSON is valid but has unexpected structure. RAW:", rawResponseText);
+      return { ...fallback, label: "Analyse Invalide", description: "La structure de la réponse IA est inattendue." };
+    } catch (parsingError) {
+      console.error("fetchOOHSentimentFromNews - JSON PARSING FAILED:", parsingError, "RAW:", rawResponseText);
+      return {
+        ...fallback,
+        label: "Analyse Indisponible",
+        description: "Le service d'analyse a renvoyé un format de données incorrect."
+      };
+    }
+  } catch (apiError) {
+    console.error("fetchOOHSentimentFromNews - API CALL FAILED:", apiError);
     return {
       ...fallback,
       label: "Analyse Indisponible",
       description: "Le service d'analyse est momentanément indisponible."
     };
-  });
+  }
 };

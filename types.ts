@@ -3,7 +3,8 @@ export enum AnalystRating {
   BUY = 'Acheter',
   STRONG_BUY = 'Renforcer',
   HOLD = 'Conserver',
-  SELL = 'Vendre'
+  SELL = 'Vendre',
+  NA = 'N/D'
 }
 
 export type PricePoint = {
@@ -22,6 +23,36 @@ export type HistoricalPricesPayload = {
   period: "1M" | "3M" | "6M" | "1Y";
   series: PriceSeries[];
 };
+
+// Type pour les données brutes de l'IA
+export interface RawCompanyFromAI {
+  ticker: string;
+  price: number;
+  change: number;
+  netDebt: string;
+  sharesOutstanding: number;
+  dividendPerShare2024?: string;
+  dividendPerShare2025?: string;
+  dividendPerShare2026?: string;
+  revenue2024?: string;
+  revenue2025?: string;
+  revenue2026?: string;
+  ebitda2024?: string;
+  ebitda2025?: string;
+  ebitda2026?: string;
+  ebit2024?: string;
+  ebit2025?: string;
+  ebit2026?: string;
+  netIncome2024?: string;
+  netIncome2025?: string;
+  netIncome2026?: string;
+  capex2024?: string;
+  capex2025?: string;
+  capex2026?: string;
+  fcf2024?: string;
+  fcf2025?: string;
+  fcf2026?: string;
+}
 
 export interface Company {
   id: string;
@@ -82,12 +113,24 @@ export interface Company {
   evEbitdaCapexForward: number; 
   evEbitdaCapexNext: number; 
   
-  ebitdaMargin: number; 
+  // Analysis Ratios
+  ebitdaMargin2024: number; 
+  ebitdaMargin2025: number;
+  ebitdaMargin2026: number;
+  ebitMargin2024: number;
+  ebitMargin2025: number;
+  ebitMargin2026: number;
+  capexRevenue2024: number;
+  capexRevenue2025: number;
+  capexRevenue2026: number;
+  fcfRevenue2024: number;
+  fcfRevenue2025: number;
+  fcfRevenue2026: number;
+
   revenueGrowth: number; 
   revenueGrowth2024: number;
   revenueGrowth2025: number;
   revenueGrowth2026: number;
-  capexSales: number;
 
   rating: AnalystRating;
   targetPrice: number | null;
@@ -144,5 +187,9 @@ export interface SectorData {
     description: string;
     keyTakeaways: string[];
     lastUpdated: string;
+  };
+  aiStatus?: {
+    lastSuccess: number | null;
+    lastError: number | null;
   };
 }

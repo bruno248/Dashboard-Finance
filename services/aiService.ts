@@ -1,70 +1,43 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { SectorData, AnalystRating } from "../types";
-import { cleanJsonResponse, withRetry } from "../utils";
+import { SectorData, AnalystRating, RawCompanyFromAI } from "../types";
+import { cleanJsonResponse, withRetry, createGenAIInstance, computeFinancialRatios } from "../utils";
+import { BASE_COMPANIES_DATA } from "../constants";
 
-export const FALLBACK_COMPANIES = [
-  { 
-    ticker: "DEC.PA", price: 0, change: 0, netDebt: "920 M", sharesOutstanding: 212, dividendYield: "--", dividendPerShare2024: "0.70", dividendPerShare2025: "0.80", dividendPerShare2026: "0.90",
-    revenue2024: "3570 M", revenue2025: "3750 M", revenue2026: "3940 M",
-    ebitda2024: "765 M", ebitda2025: "810 M", ebitda2026: "860 M",
-    ebit2024: "285 M", ebit2025: "320 M", ebit2026: "360 M",
-    netIncome2024: "180 M", netIncome2025: "210 M", netIncome2026: "250 M",
-    capex2024: "350 M", capex2025: "360 M", capex2026: "370 M",
-    fcf2024: "200 M", fcf2025: "240 M", fcf2026: "280 M"
-  },
-  { 
-    ticker: "LAMR", price: 0, change: 0, netDebt: "3150 M", sharesOutstanding: 102, dividendYield: "--", dividendPerShare2024: "5.20", dividendPerShare2025: "5.40", dividendPerShare2026: "5.60",
-    revenue2024: "2150 M", revenue2025: "2300 M", revenue2026: "2450 M",
-    ebitda2024: "980 M", ebitda2025: "1050 M", ebitda2026: "1120 M",
-    ebit2024: "810 M", ebit2025: "870 M", ebit2026: "940 M",
-    netIncome2024: "465 M", netIncome2025: "510 M", netIncome2026: "560 M",
-    capex2024: "145 M", capex2025: "150 M", capex2026: "155 M",
-    fcf2024: "620 M", fcf2025: "680 M", fcf2026: "740 M"
-  },
-  { 
-    ticker: "SAX.DE", price: 0, change: 0, netDebt: "1450 M", sharesOutstanding: 57, dividendYield: "--", dividendPerShare2024: "1.85", dividendPerShare2025: "1.95", dividendPerShare2026: "2.10",
-    revenue2024: "1820 M", revenue2025: "1910 M", revenue2026: "2000 M",
-    ebitda2024: "540 M", ebitda2025: "570 M", ebitda2026: "600 M",
-    ebit2024: "320 M", ebit2025: "350 M", ebit2026: "380 M",
-    netIncome2024: "180 M", netIncome2025: "200 M", netIncome2026: "220 M",
-    capex2024: "100 M", capex2025: "105 M", capex2026: "110 M",
-    fcf2024: "310 M", fcf2025: "340 M", fcf2026: "370 M"
-  },
-  { 
-    ticker: "OUT", price: 0, change: 0, netDebt: "2500 M", sharesOutstanding: 167, dividendYield: "--", dividendPerShare2024: "1.22", dividendPerShare2025: "1.25", dividendPerShare2026: "1.28",
-    revenue2024: "1850 M", revenue2025: "1950 M", revenue2026: "2050 M",
-    ebitda2024: "450 M", ebitda2025: "480 M", ebitda2026: "510 M",
-    ebit2024: "250 M", ebit2025: "270 M", ebit2026: "290 M",
-    netIncome2024: "100 M", netIncome2025: "120 M", netIncome2026: "140 M",
-    capex2024: "100 M", capex2025: "100 M", capex2026: "100 M",
-    fcf2024: "200 M", fcf2025: "220 M", fcf2026: "240 M"
-  },
-  {
-    ticker: "CCO", price: 0, change: 0, netDebt: "5100 M", sharesOutstanding: 485, dividendYield: "--", dividendPerShare2024: "0.00", dividendPerShare2025: "0.00", dividendPerShare2026: "0.00",
-    revenue2024: "2200 M", revenue2025: "2250 M", revenue2026: "2300 M",
-    ebitda2024: "550 M", ebitda2025: "580 M", ebitda2026: "610 M",
-    ebit2024: "150 M", ebit2025: "170 M", ebit2026: "190 M",
-    netIncome2024: "-50 M", netIncome2025: "-20 M", netIncome2026: "10 M",
-    capex2024: "150 M", capex2025: "150 M", capex2026: "150 M",
-    fcf2024: "50 M", fcf2025: "70 M", fcf2026: "90 M"
-  },
-  {
-    ticker: "4071.SR", price: 0, change: 0, netDebt: "0 M", sharesOutstanding: 50, dividendYield: "--", dividendPerShare2024: "5.50", dividendPerShare2025: "6.00", dividendPerShare2026: "6.50",
-    revenue2024: "1100 M", revenue2025: "1300 M", revenue2026: "1500 M",
-    ebitda2024: "450 M", ebitda2025: "550 M", ebitda2026: "650 M",
-    ebit2024: "430 M", ebit2025: "530 M", ebit2026: "630 M",
-    netIncome2024: "400 M", netIncome2025: "500 M", netIncome2026: "600 M",
-    capex2024: "80 M", capex2025: "90 M", capex2026: "100 M",
-    fcf2024: "350 M", fcf2025: "440 M", fcf2026: "530 M"
-  }
-];
+export const FALLBACK_COMPANIES = BASE_COMPANIES_DATA.map(c => ({
+    ticker: c.ticker,
+    price: 0,
+    change: 0,
+    netDebt: c.netDebt,
+    sharesOutstanding: c.sharesOutstanding,
+    dividendPerShare2024: c.dividendPerShare2024,
+    dividendPerShare2025: c.dividendPerShare2025,
+    dividendPerShare2026: c.dividendPerShare2026,
+    revenue2024: c.revenue2024,
+    revenue2025: c.revenue2025,
+    revenue2026: c.revenue2026,
+    ebitda2024: c.ebitda2024,
+    ebitda2025: c.ebitda2025,
+    ebitda2026: c.ebitda2026,
+    ebit2024: c.ebit2024,
+    ebit2025: c.ebit2025,
+    ebit2026: c.ebit2026,
+    netIncome2024: c.netIncome2024,
+    netIncome2025: c.netIncome2025,
+    netIncome2026: c.netIncome2026,
+    capex2024: c.capex2024,
+    capex2025: c.capex2025,
+    capex2026: c.capex2026,
+    fcf2024: c.fcf2024,
+    fcf2025: c.fcf2025,
+    fcf2026: c.fcf2026,
+}));
 
 const FALLBACK_QUOTES: { ticker: string; price: number; change: number }[] = [];
 
 export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: string; price: number; change: number }[]> {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const prompt = `Get the latest stock price and percentage change for these tickers: ${tickers.join(", ")}.`;
     const schema = {
       type: Type.OBJECT,
@@ -85,7 +58,7 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
       required: ["quotes"],
     };
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -104,7 +77,7 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
 
 export async function fetchOOHRatings(tickers: string[]): Promise<{ ticker: string; rating: AnalystRating }[]> {
     return withRetry(async () => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = createGenAIInstance();
         const ratingEnumValues = Object.values(AnalystRating).join("', '");
         const prompt = `Pour les tickers suivants : ${tickers.join(', ')}, trouve le consensus de recommandation des analystes (analyst rating consensus). Mappe le résultat à l'une de ces valeurs exactes : '${ratingEnumValues}'. Si le consensus n'est pas clair, ne renvoie rien pour ce ticker.`;
         const schema = {
@@ -146,8 +119,9 @@ export async function fetchOOHRatings(tickers: string[]): Promise<{ ticker: stri
 
 export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker: string; targetPrice: number | null }[]> {
     return withRetry(async () => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = createGenAIInstance();
         const prompt = `Pour chaque ticker suivant : ${tickers.join(', ')}, trouve l'objectif de cours consensus des analystes (analyst consensus target price). Cherche des sources fiables comme Bloomberg, Reuters, FactSet ou des rapports d'analystes. Fournis la valeur numérique dans la monnaie locale du titre. Si aucun consensus clair n'est disponible, renvoie null pour targetPrice.`;
+        // @FIX: Removed non-standard `nullable: true` and made `targetPrice` optional by removing it from `required` array.
         const schema = {
             type: Type.OBJECT,
             properties: {
@@ -157,9 +131,9 @@ export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker:
                         type: Type.OBJECT,
                         properties: {
                             ticker: { type: Type.STRING },
-                            targetPrice: { type: Type.NUMBER, nullable: true },
+                            targetPrice: { type: Type.NUMBER },
                         },
-                        required: ["ticker", "targetPrice"],
+                        required: ["ticker"],
                     },
                 },
             },
@@ -178,16 +152,23 @@ export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker:
             },
         });
         const rawData = JSON.parse(cleanJsonResponse(response.text));
-        return rawData.targets || [];
+        // @FIX: Handle optional targetPrice to align with return type.
+        if (rawData.targets && Array.isArray(rawData.targets)) {
+            return rawData.targets.map((t: { ticker: string; targetPrice?: number }) => ({
+                ticker: t.ticker,
+                targetPrice: t.targetPrice ?? null,
+            }));
+        }
+        return [];
     }).catch(e => {
         console.warn("fetchOOHTargetPrices a échoué, les objectifs de cours ne seront pas mis à jour.", e);
         return [];
     });
 }
 
-export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpdated: string; companies: any[] }> {
+export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpdated: string; companies: RawCompanyFromAI[] }> {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const today = new Date().toISOString().split('T')[0];
     
     const prompt = `En tant qu'analyste financier expert du secteur OOH, recherche les données les plus récentes sur Internet pour les tickers suivants : ${tickers.join(", ")}.
@@ -230,9 +211,20 @@ Fournis les chiffres clés demandés par le schéma JSON.`;
               netIncome2025: { type: Type.STRING },
               netIncome2026: { type: Type.STRING },
               capex2024: { type: Type.STRING },
+              capex2025: { type: Type.STRING },
+              capex2026: { type: Type.STRING },
               fcf2024: { type: Type.STRING },
+              fcf2025: { type: Type.STRING },
+              fcf2026: { type: Type.STRING },
             },
-            required: ["ticker", "price", "change", "netDebt", "sharesOutstanding"]
+            required: [
+              "ticker", "price", "change", "netDebt", "sharesOutstanding",
+              "revenue2024", "revenue2025", "revenue2026",
+              "ebitda2024", "ebitda2025", "ebitda2026",
+              "ebit2024", "ebit2025", "ebit2026",
+              "netIncome2024", "netIncome2025", "netIncome2026",
+              "capex2024", "capex2025", "capex2026"
+            ]
           },
         },
       },
@@ -270,7 +262,7 @@ Fournis les chiffres clés demandés par le schéma JSON.`;
 
 export async function queryCompanyAI(prompt: string, context: SectorData): Promise<string> {
   return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const simplifiedContext = context.companies.map(c => ({ 
       t: c.ticker, r25: c.revenue2025, eb25: c.ebitda2025, ebit25: c.ebit2025, per25: c.perForward 
     }));

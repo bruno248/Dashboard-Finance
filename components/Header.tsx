@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface HeaderProps {
@@ -7,9 +8,15 @@ interface HeaderProps {
   onRefresh?: () => void;
   onScreenerClick?: () => void;
   loading?: boolean;
+  dataAges?: {
+    financials: string;
+    news: string;
+    calendar: string;
+    docs: string;
+  };
 }
 
-const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, onRefresh, onScreenerClick, loading }) => {
+const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, onRefresh, onScreenerClick, loading, dataAges }) => {
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
   return (
@@ -25,6 +32,17 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, onRefresh, onS
           <p className="text-slate-400 text-[10px] md:text-sm flex items-center gap-2">
             {subtitle} <span className="w-0.5 h-0.5 bg-slate-600 rounded-full"></span> {today}
           </p>
+          {dataAges && (
+            <div className="mt-2 text-[9px] text-slate-500 font-semibold tracking-tight flex flex-wrap gap-x-2 gap-y-1">
+              <span>Cours: <span className="font-bold text-slate-400">{dataAges.financials}</span></span>
+              <span className="text-slate-600">•</span>
+              <span>News: <span className="font-bold text-slate-400">{dataAges.news}</span></span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
+              <span>Agenda: <span className="font-bold text-slate-400">{dataAges.calendar}</span></span>
+               <span className="text-slate-600 hidden sm:inline">•</span>
+              <span>Docs: <span className="font-bold text-slate-400">{dataAges.docs}</span></span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -36,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, onRefresh, onS
         </div>
         
         <button onClick={onScreenerClick} className="px-3 md:px-5 py-2 md:py-2.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg flex items-center gap-2 hover:bg-emerald-500 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
           <span className="hidden md:inline">Screener</span>
         </button>
       </div>

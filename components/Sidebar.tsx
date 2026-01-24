@@ -1,12 +1,35 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { SectorData } from '../types';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  aiStatus?: SectorData['aiStatus'];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, aiStatus }) => {
   const [hasCustomKey, setHasCustomKey] = useState(false);
+
+  const apiStatus = useMemo(() => {
+    if (!aiStatus) return { text: 'En attente', color: 'slate', pulse: false };
+
+    const { lastSuccess, lastError } = aiStatus;
+    
+    if (!lastSuccess && !lastError) {
+      return { text: 'En attente', color: 'slate', pulse: false };
+    }
+
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    const isSuccessRecent = lastSuccess && lastSuccess > tenMinutesAgo;
+    const isErrorMoreRecent = lastError && lastSuccess && lastError > lastSuccess;
+
+    if (isSuccessRecent && !isErrorMoreRecent) {
+      return { text: 'OK', color: 'emerald', pulse: true };
+    }
+
+    return { text: 'Instable', color: 'amber', pulse: false };
+  }, [aiStatus]);
 
   useEffect(() => {
     const checkKey = async () => {
@@ -23,7 +46,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const handleKeySelection = async () => {
     if (window.aistudio?.openSelectKey) {
       await window.aistudio.openSelectKey();
-      // On assume le succès selon les guidelines
       setHasCustomKey(true);
     }
   };
@@ -85,7 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             className={`w-full p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 ${
               hasCustomKey 
                 ? 'bg-emerald-500/5 border-emerald-500/30 hover:bg-emerald-500/10' 
-                : 'bg-amber-500/5 border-amber-500/30 hover:bg-amber-500/10 animate-pulse'
+                : 'bg-amber-500/5 border-amber-500/30 hover:bg-amber-500/10 md:animate-pulse'
             }`}
           >
             <div className="text-[8px] uppercase tracking-widest font-black text-slate-500">API Key Storage</div>
@@ -99,12 +121,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         </div>
 
         <div className="p-4 mx-3 mb-6 bg-slate-900/50 rounded-2xl border border-slate-700/50">
-          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-black mb-1">Live Feed</div>
-          <div className="text-xs font-bold flex items-center gap-2">Gemini 3 Flash <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span></div>
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-black mb-1">Statut du service IA</div>
+          <div className="text-xs font-bold flex items-center gap-2">
+             <span className={`w-2 h-2 bg-${apiStatus.color}-500 rounded-full ${apiStatus.pulse ? 'animate-pulse' : ''}`}></span>
+             <span className={`text-${apiStatus.color}-400`}>{apiStatus.text}</span>
+          </div>
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 md:hidden z-50 flex justify-around items-center px-2 py-3 backdrop-blur-xl bg-opacity-95 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 md:hidden z-50 flex justify-around items-center px-2 py-3 md:backdrop-blur-xl bg-opacity-95 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
         {menuItems.map((item) => (
           <button
             key={item.id}

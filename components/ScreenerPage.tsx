@@ -17,14 +17,14 @@ const ScreenerPage: React.FC<ScreenerPageProps> = ({ data, onSelectCompany }) =>
 
   const filteredResults = useMemo(() => {
     return companies.filter(c => {
-      const margin = c.ebitdaMargin || 0;
+      const margin = c.ebitdaMargin2024 || 0;
       const multiple = c.evEbitdaForward || c.evEbitda || 0; // Priorité au Forward
       const mktCap = parseFinancialValue(c.marketCap);
 
       return margin >= minMargin && 
              (multiple > 0 ? multiple <= maxEvEbitda : true) && 
              mktCap >= minCap;
-    }).sort((a, b) => (b.ebitdaMargin || 0) - (a.ebitdaMargin || 0));
+    }).sort((a, b) => (b.ebitdaMargin2024 || 0) - (a.ebitdaMargin2024 || 0));
   }, [companies, minMargin, maxEvEbitda, minCap]);
 
   return (
@@ -74,7 +74,7 @@ const ScreenerPage: React.FC<ScreenerPageProps> = ({ data, onSelectCompany }) =>
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-700/50">
                 <span className="text-[9px] font-black text-slate-600 block mb-1">MARGE</span>
-                <span className="text-sm font-black text-white">{c.ebitdaMargin?.toFixed(1)}%</span>
+                <span className="text-sm font-black text-white">{c.ebitdaMargin2024?.toFixed(1)}%</span>
               </div>
               <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-700/50">
                 <span className="text-[9px] font-black text-slate-600 block mb-1">EV/EBITDA</span>

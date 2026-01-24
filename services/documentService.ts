@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { DocumentItem } from "../types";
-import { cleanJsonResponse } from "../utils";
+import { cleanJsonResponse, createGenAIInstance } from "../utils";
 
 const FALLBACK_DOCS: DocumentFetchResult = {};
 
@@ -38,12 +38,15 @@ const docSchema = {
   required: ["documentsByTicker"]
 };
 
-export const fetchOOHDocuments = async (): Promise<DocumentFetchResult> => {
+export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetchResult> => {
+  if (!tickers || tickers.length === 0) {
+    return FALLBACK_DOCS;
+  }
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: "Find latest financial reports (annual, quarterly, investor presentations) for OOH companies JCDecaux, Lamar Advertising, and Ströer.",
+      contents: `Trouve les derniers rapports financiers (annuels, trimestriels, présentations investisseurs) pour les sociétés OOH suivantes : ${tickers.join(", ")}. Pour chaque société, renvoie une liste de 2 à 4 documents pertinents. Structure la réponse en suivant scrupuleusement le schéma JSON fourni, en groupant les documents par ticker dans le tableau 'documentsByTicker'.`,
       config: { 
         tools: [{ googleSearch: {} }], 
         responseMimeType: "application/json",
@@ -69,7 +72,7 @@ export const fetchOOHDocuments = async (): Promise<DocumentFetchResult> => {
     
     return FALLBACK_DOCS;
   } catch (error) {
-    console.warn("fetchOOHDocuments failed, returning fallback.", error);
+    console.error("fetchOOHDocuments failed, returning fallback.", error);
     return FALLBACK_DOCS;
   }
 };

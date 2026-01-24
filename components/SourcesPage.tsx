@@ -89,6 +89,23 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
         { key: 'fcf2026', label: 'FCF 2026E', type: 'currency' },
       ]
     },
+     {
+      label: 'ANALYSES',
+      metrics: [
+        { key: 'fcfRevenue2024', label: 'FCF / Revenue 2024', type: 'percent' },
+        { key: 'fcfRevenue2025', label: 'FCF / Revenue 2025E', type: 'percent' },
+        { key: 'fcfRevenue2026', label: 'FCF / Revenue 2026E', type: 'percent' },
+        { key: 'capexRevenue2024', label: 'CAPEX / Revenue 2024', type: 'percent' },
+        { key: 'capexRevenue2025', label: 'CAPEX / Revenue 2025E', type: 'percent' },
+        { key: 'capexRevenue2026', label: 'CAPEX / Revenue 2026E', type: 'percent' },
+        { key: 'ebitdaMargin2024', label: 'Marge EBITDA 2024', type: 'percent' },
+        { key: 'ebitdaMargin2025', label: 'Marge EBITDA 2025E', type: 'percent' },
+        { key: 'ebitdaMargin2026', label: 'Marge EBITDA 2026E', type: 'percent' },
+        { key: 'ebitMargin2024', label: 'Marge EBIT 2024', type: 'percent' },
+        { key: 'ebitMargin2025', label: 'Marge EBIT 2025E', type: 'percent' },
+        { key: 'ebitMargin2026', label: 'Marge EBIT 2026E', type: 'percent' },
+      ]
+    },
     {
       label: 'MULTIPLES DE VALORISATION',
       metrics: [
@@ -121,20 +138,24 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
   ];
 
   const renderCellValue = (val: any, type: string) => {
-    if (val === undefined || val === null || val === '--' || val === 0) return '--';
+    if (val === undefined || val === null || val === '--' || val === '') return '--';
+    // N'applique le filtre isNaN/zéro qu'aux types numériques, pas aux agrégats de type 'currency'.
+    if (type !== 'string' && type !== 'currency' && (isNaN(val) || val === 0)) return '--';
+    
     switch (type) {
       case 'currency': return formatCurrencyShort(val);
       case 'multiple': return typeof val === 'number' ? formatMultiple(val) : val;
+      case 'percent': return typeof val === 'number' ? `${val.toFixed(1)}%` : val;
       default: return val;
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto pb-20">
-      <section className="bg-slate-800 p-8 rounded-[2rem] border border-slate-700 shadow-xl">
+      <section className="bg-slate-800 p-4 md:p-8 rounded-xl md:rounded-[2rem] border border-slate-700 shadow-xl">
         <div className="flex flex-col lg:flex-row justify-between gap-8 mb-4">
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-white uppercase tracking-tight">Peer Group OOH</h3>
+            <h3 className="text-base md:text-xl font-bold text-white uppercase tracking-tight">Peer Group OOH</h3>
             <div className="flex flex-wrap gap-2 mt-4">
               {allCompanies.map(c => (
                 <button key={c.ticker} onClick={() => toggleTicker(c.ticker)} className={`px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${visibleTickers.includes(c.ticker) ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>
@@ -154,14 +175,14 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
         </div>
       </section>
 
-      <div className="bg-slate-800 rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-2xl">
+      <div className="bg-slate-800 rounded-xl md:rounded-[2.5rem] border border-slate-700 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto no-scrollbar">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-900 text-slate-500 uppercase text-[10px] font-black border-b-2 border-slate-700">
               <tr>
-                <th className="px-8 py-6 sticky left-0 bg-slate-900 z-20 w-64 border-r border-slate-700">Agrégat / Multiple</th>
+                <th className="px-2 py-3 md:px-8 md:py-6 sticky left-0 bg-slate-900 z-20 w-28 md:w-64 border-r border-slate-700">Agrégat / Multiple</th>
                 {filteredCompanies.map(c => (
-                  <th key={c.ticker} className="px-8 py-6 text-center text-white min-w-[140px]">{c.ticker}</th>
+                  <th key={c.ticker} className="px-2 py-3 md:px-8 md:py-6 text-center text-white min-w-[100px] md:min-w-[140px]">{c.ticker}</th>
                 ))}
               </tr>
             </thead>
@@ -169,15 +190,15 @@ const SourcesPage: React.FC<SourcesPageProps> = ({ data, onAddTicker }) => {
               {metricsGroups.map(group => (
                 <React.Fragment key={group.label}>
                   <tr className="bg-slate-900">
-                    <td colSpan={filteredCompanies.length + 1} className="px-8 py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-slate-900 sticky left-0 border-r border-slate-700 border-b-2 border-slate-700">
+                    <td colSpan={filteredCompanies.length + 1} className="px-2 py-2 md:px-8 md:py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-slate-900 sticky left-0 border-r border-slate-700 border-b-2 border-slate-700">
                       {group.label}
                     </td>
                   </tr>
                   {group.metrics.map(m => (
                     <tr key={m.key} className="hover:bg-slate-700/20 group">
-                      <td className="px-8 py-4 font-bold text-slate-300 sticky left-0 bg-slate-800 border-r border-slate-700 group-hover:bg-slate-700 transition-colors">{m.label}</td>
+                      <td className="px-2 py-2 md:px-8 md:py-4 font-bold text-slate-300 text-xs md:text-sm sticky left-0 bg-slate-800 border-r border-slate-700 group-hover:bg-slate-700 transition-colors">{m.label}</td>
                       {filteredCompanies.map(c => (
-                        <td key={c.ticker} className="px-8 py-4 text-center font-mono text-[11px] text-slate-100 font-bold">
+                        <td key={c.ticker} className="px-2 py-2 md:px-8 md:py-4 text-center font-mono text-[11px] text-slate-100 font-bold">
                           {renderCellValue((c as any)[m.key], m.type)}
                         </td>
                       ))}
