@@ -192,4 +192,5 @@ export interface SectorData {
     lastSuccess: number | null;
     lastError: number | null;
   };
+  timestamps: Record<string, number>;
 }

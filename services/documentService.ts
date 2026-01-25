@@ -49,6 +49,10 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
       model: "gemini-3-pro-preview",
       contents: `Trouve les derniers rapports financiers (annuels, trimestriels, présentations investisseurs) pour les sociétés OOH suivantes : ${tickers.join(", ")}. Pour chaque société, renvoie une liste de 2 à 4 documents pertinents.
       
+**Stratégie & Priorités :**
+1.  **Priorité au contenu :** L'objectif est de lister les documents existants. Trouve le **titre exact** et la **date de publication ('YYYY-MM-DD')**.
+2.  **URL optionnelle :** Si tu ne trouves pas un lien direct (URL) vers le document (ex: un PDF), ce n'est pas grave. OMETS simplement le champ 'url', mais inclus quand même l'entrée du document avec son titre et sa date.
+
 **RÈGLES IMPÉRATIVES DE FORMATAGE JSON :**
 - **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma.
 - **Échappement OBLIGATOIRE des guillemets** : C'est la cause d'erreur la plus fréquente. Les guillemets (") dans les titres DOIVENT être échappés avec un backslash (\\).

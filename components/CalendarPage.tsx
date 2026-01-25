@@ -1,25 +1,26 @@
 
 import React, { useState, useMemo } from 'react';
-import { EventItem } from '../types';
+import { EventItem, SectorData } from '../types';
+import { formatAge } from '../utils';
 
 interface CalendarPageProps {
-  events: EventItem[];
+  data: SectorData;
   loading?: boolean;
 }
 
 const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ data, loading }) => {
   const [currentDate, setCurrentDate] = useState(new Date()); 
   const [view, setView] = useState<'grid' | 'list'>(window.innerWidth < 768 ? 'list' : 'grid');
   
   const todayStr = new Date().toISOString().split('T')[0];
 
   const futureEvents = useMemo(() => {
-    return events
+    return (data.events || [])
       .filter(e => e.date >= todayStr)
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [events, todayStr]);
+  }, [data.events, todayStr]);
 
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -54,6 +55,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
     const diff = (date.getTime() - today.getTime()) / (1000 * 3600 * 24);
     return diff >= 0 && diff <= 7;
   };
+  
+  const lastSyncAge = useMemo(() => formatAge(data?.timestamps?.calendar), [data?.timestamps?.calendar]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 md:pb-10 px-1">
@@ -65,7 +68,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events, loading }) => {
             </button>
             <div className="text-center">
               <h2 className="text-base md:text-2xl font-black text-white min-w-[120px] md:min-w-[200px]">{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
-              <p className="text-[9px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">Agenda des publications</p>
+              <p className="text-[9px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">Dernière synchro : <span className="text-emerald-400">{lastSyncAge}</span></p>
             </div>
             <button onClick={() => changeMonth(1)} title="Mois suivant" className="p-2 bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg text-emerald-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>

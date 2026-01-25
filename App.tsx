@@ -23,10 +23,9 @@ const FINANCIALS_TTL = 5 * 60 * 1000;
 const FUNDAMENTALS_TTL = 60 * 60 * 1000; // 1 heure
 const NEWS_TTL = 15 * 60 * 1000;
 const SENTIMENT_TTL = 2 * 60 * 60 * 1000; // 2 heures
-const DOCS_TTL = 120 * 60 * 1000;
-const CALENDAR_TTL = 240 * 60 * 1000;
 const HIGHLIGHTS_TTL = 24 * 60 * 60 * 1000;
 const RATINGS_TTL = 24 * 60 * 60 * 1000; // 24h pour les ratings
+const WEEKLY_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'news' | 'analysis' | 'docs' | 'calendar' | 'sources' | 'screener'>('overview');
@@ -40,7 +39,7 @@ const App: React.FC = () => {
   
   const [loadingStatus, setLoadingStatus] = useState('');
   
-  const [data, setData] = useState<SectorData & { timestamps: Record<string, number> }>(() => {
+  const [data, setData] = useState<SectorData>(() => {
     const saved = localStorage.getItem(CACHE_KEY);
     if (saved) {
       try {
@@ -260,17 +259,17 @@ const App: React.FC = () => {
       console.log('News TTL expired, calling refreshNews()');
       refreshNews();
     }
-    if (now - (data.timestamps?.calendar || 0) > CALENDAR_TTL) {
-      console.log('Calendar TTL expired, calling refreshCalendar()');
-      refreshCalendar();
-    }
-    if (now - (data.timestamps?.docs || 0) > DOCS_TTL) {
-        console.log('Docs TTL expired, calling refreshDocs()');
-        refreshDocs();
-    }
     if (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL) {
-        console.log('Highlights TTL expired, calling refreshHighlights()');
-        refreshHighlights();
+      console.log('Highlights TTL expired, calling refreshHighlights()');
+      refreshHighlights();
+    }
+    if (now - (data.timestamps?.docs || 0) > WEEKLY_TTL) {
+      console.log('Docs TTL (weekly) expired, calling refreshDocs()');
+      refreshDocs();
+    }
+    if (now - (data.timestamps?.calendar || 0) > WEEKLY_TTL) {
+      console.log('Calendar TTL (weekly) expired, calling refreshCalendar()');
+      refreshCalendar();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -312,8 +311,8 @@ const App: React.FC = () => {
       case 'overview': return <DashboardOverview data={data} onSelectCompany={handleSelectCompany} />;
       case 'news': return <NewsPage news={data.news} highlights={data.highlights} sentiment={data.sentiment} loading={newsLoading || highlightsLoading} />;
       case 'analysis': return <AnalysisPage data={data} />;
-      case 'docs': return <DocumentsPage docs={data.documents} data={data} loading={docsLoading} />;
-      case 'calendar': return <CalendarPage events={data.events} loading={calendarLoading} />;
+      case 'docs': return <DocumentsPage data={data} loading={docsLoading} />;
+      case 'calendar': return <CalendarPage data={data} loading={calendarLoading} />;
       case 'sources': return <SourcesPage data={data} onAddTicker={handleAddTicker} />;
       case 'screener': return <ScreenerPage data={data} onSelectCompany={handleSelectCompany} />;
       default: return <DashboardOverview data={data} onSelectCompany={handleSelectCompany} />;
