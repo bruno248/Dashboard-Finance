@@ -160,6 +160,7 @@ export interface EventItem {
   title: string;
   date: string; 
   type?: string;
+  ticker?: string;
 }
 
 export interface DocumentItem {

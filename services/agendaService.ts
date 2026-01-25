@@ -18,6 +18,7 @@ const agendaSchema = {
                     title: { type: Type.STRING },
                     date: { type: Type.STRING, description: "Date in 'YYYY-MM-DD' format" },
                     type: { type: Type.STRING, description: "e.g., 'Earnings', 'Shareholder Meeting'" },
+                    ticker: { type: Type.STRING, description: "Ticker of the company if the event is specific to one" },
                 },
                 required: ["id", "title", "date", "type"]
             },
@@ -34,7 +35,7 @@ export const fetchOOHAgenda = async (): Promise<EventItem[]> => {
     const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Trouve jusqu'à 15 des prochains événements financiers (publications de résultats, journées investisseurs, assemblées générales) pour les entreprises du secteur OOH suivantes : ${companyList}, attendus dans les 12 prochains mois.
+      contents: `Trouve jusqu'à 15 des prochains événements financiers (publications de résultats, journées investisseurs, assemblées générales) pour les entreprises du secteur OOH suivantes : ${companyList}, attendus dans les 12 prochains mois. Pour chaque événement, si possible, identifie et inclus le ticker de l'entreprise concernée.
 
 **Règles de formatage impératives :**
 - **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma. Toutes les clés et les valeurs de type chaîne de caractères doivent être entourées de guillemets doubles ("").

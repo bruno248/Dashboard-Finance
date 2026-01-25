@@ -45,20 +45,36 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
   
   return withRetry(async () => {
     const ai = createGenAIInstance();
+    // Prompt renforcé avec un exemple de structure explicite
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Trouve les derniers rapports financiers (annuels, trimestriels, présentations investisseurs) pour les sociétés OOH suivantes : ${tickers.join(", ")}. Pour chaque société, renvoie une liste de 2 à 4 documents pertinents.
-      
-**Stratégie & Priorités :**
-1.  **Priorité au contenu :** L'objectif est de lister les documents existants. Trouve le **titre exact** et la **date de publication ('YYYY-MM-DD')**.
-2.  **URL optionnelle :** Si tu ne trouves pas un lien direct (URL) vers le document (ex: un PDF), ce n'est pas grave. OMETS simplement le champ 'url', mais inclus quand même l'entrée du document avec son titre et sa date.
+      contents: `Pour chaque ticker (${tickers.join(", ")}), trouve 2-4 rapports financiers récents.
 
-**RÈGLES IMPÉRATIVES DE FORMATAGE JSON :**
-- **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma.
-- **Échappement OBLIGATOIRE des guillemets** : C'est la cause d'erreur la plus fréquente. Les guillemets (") dans les titres DOIVENT être échappés avec un backslash (\\).
-    - **Exemple correct :** \`{"title": "Rapport Annuel \\"Vision 2025\\""}\`
-    - **Exemple INCORRECT :** \`{"title": "Rapport Annuel "Vision 2025""}\`
-- La réponse doit être structurée en groupant les documents par ticker dans le tableau 'documentsByTicker'.`,
+**RÈGLES DE FORMATAGE IMPÉRATIVES :**
+1.  **Structure JSON stricte :** La réponse DOIT être un objet JSON unique contenant une seule clé principale : \`"documentsByTicker"\`.
+2.  La valeur de \`"documentsByTicker"\` DOIT être un tableau (array) d'objets.
+3.  Chaque objet dans le tableau DOIT contenir deux clés : \`"ticker"\` (string) et \`"docs"\` (un tableau de documents).
+4.  **Exemple de structure à respecter impérativement :**
+    \`\`\`json
+    {
+      "documentsByTicker": [
+        {
+          "ticker": "DEC.PA",
+          "docs": [
+            { "id": "dec_q3_2024", "type": "Report", "title": "Q3 2024 Revenue Report", "date": "2024-10-26", "url": "..." }
+          ]
+        },
+        {
+          "ticker": "OUT",
+          "docs": [
+            { "id": "out_q3_2024", "type": "PPT", "title": "Q3 2024 Earnings Presentation", "date": "2024-11-01" }
+          ]
+        }
+      ]
+    }
+    \`\`\`
+5.  **Échappement des guillemets :** N'oublie pas d'échapper les guillemets (") dans les titres avec un backslash (\\).
+6.  **Ne renvoie AUCUN texte en dehors de cet objet JSON.**`,
       config: { 
         tools: [{ googleSearch: {} }], 
         responseMimeType: "application/json",
@@ -74,6 +90,7 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
       const parsed = JSON.parse(cleanJsonResponse(rawResponseText));
       const result: DocumentFetchResult = {};
       
+      // La validation existante est déjà correcte, elle attend la structure que nous avons imposée
       if (parsed.documentsByTicker && Array.isArray(parsed.documentsByTicker)) {
         parsed.documentsByTicker.forEach((item: { ticker: string, docs: DocumentItem[] }) => {
           if (item.ticker && Array.isArray(item.docs)) {
@@ -81,15 +98,15 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
             result[normalizedTicker] = item.docs;
           }
         });
-        if (Object.keys(result).length > 0) return result;
+        return result;
       }
       
-      console.warn("fetchOOHDocuments - JSON is valid but has unexpected structure. RAW:", rawResponseText);
+      console.warn("fetchOOHDocuments - JSON valide mais structure inattendue. RAW:", rawResponseText);
       return FALLBACK_DOCS;
 
     } catch (parsingError) {
       console.error("fetchOOHDocuments - JSON PARSING FAILED:", parsingError, "RAW:", rawResponseText);
-      return FALLBACK_DOCS; // Ne pas relancer sur une erreur de parsing
+      return FALLBACK_DOCS;
     }
   }).catch((apiError) => {
     console.error("fetchOOHDocuments - API CALL FAILED after retries:", apiError);

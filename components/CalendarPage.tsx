@@ -96,8 +96,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ data, loading }) => {
                       <span className={`text-[9px] md:text-xs font-black ${d.events && d.events.length > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>{d.day}</span>
                       <div className="flex flex-col gap-1 overflow-hidden">
                         {d.events?.map((e, idx) => (
-                          <div key={idx} title={e.title} className={`rounded p-1 text-[7px] md:text-[8px] font-black leading-tight truncate ${isImminent(e.date) ? 'bg-emerald-500 text-slate-900' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                            {e.title}
+                          <div key={idx} title={e.ticker ? `${e.ticker}: ${e.title}` : e.title} className={`rounded p-1 text-[7px] md:text-[8px] font-black leading-tight truncate ${isImminent(e.date) ? 'bg-emerald-500 text-slate-900' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                            {e.ticker && <span className="font-bold opacity-80">{e.ticker}: </span>}{e.title}
                           </div>
                         ))}
                       </div>
@@ -134,7 +134,12 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ data, loading }) => {
                           )}
                         </div>
                         <p className="text-[8px] md:text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest flex items-center gap-2">
-                           <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                           {ev.ticker && (
+                              <>
+                                <span className="text-emerald-400">{ev.ticker}</span>
+                                <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                              </>
+                           )}
                            {ev.type || 'Événement'}
                         </p>
                       </div>

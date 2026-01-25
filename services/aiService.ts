@@ -35,16 +35,11 @@ export const FALLBACK_COMPANIES = BASE_COMPANIES_DATA.map(c => ({
 
 const FALLBACK_QUOTES: { ticker: string; price: number; change: number }[] = [];
 
-export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: string; price: number; change: number }[]> {
+export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: string; price: number; change: number }[] | null> {
+  console.log("QUOTES REQUEST TICKERS", tickers);
   return withRetry(async () => {
     const ai = createGenAIInstance();
-    const prompt = `En tant qu'API de données financières, récupère le dernier cours de clôture ('price') et la variation en pourcentage par rapport à la veille ('change') pour les tickers suivants : ${tickers.join(", ")}.
-
-**Règles impératives :**
-- La réponse DOIT être un objet JSON valide, strictement conforme au schéma fourni.
-- Le prix doit être un nombre dans la monnaie locale du titre.
-- Si un ticker est invalide ou introuvable, ne l'inclus pas dans la réponse.
-- N'inclus aucun texte en dehors de l'objet JSON.`;
+    const prompt = `Récupère le dernier cours ('price') et la variation journalière ('change' en %) pour les tickers suivants : ${tickers.join(", ")}. Renvoie uniquement le JSON.`;
 
     const schema = {
       type: Type.OBJECT,
@@ -75,14 +70,14 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
       },
     });
 
-    console.log('IA raw response for quotes:', response.text);
+    console.log("QUOTES RAW RESPONSE", response.text);
     const rawData = JSON.parse(cleanJsonResponse(response.text));
-    console.log('Parsed quotes data:', rawData);
+    console.log("QUOTES PARSED", rawData);
 
     return rawData.quotes || [];
   }).catch(e => {
     console.error("fetchOOHQuotes a échoué après plusieurs tentatives:", e);
-    return [];
+    return null;
   });
 }
 
@@ -131,8 +126,9 @@ export async function fetchOOHRatings(tickers: string[]): Promise<{ ticker: stri
 export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker: string; targetPrice: number | null }[]> {
     return withRetry(async () => {
         const ai = createGenAIInstance();
-        const prompt = `Pour chaque ticker suivant : ${tickers.join(', ')}, trouve l'objectif de cours consensus des analystes (analyst consensus target price). Cherche des sources fiables comme Bloomberg, Reuters, FactSet ou des rapports d'analystes. Fournis la valeur numérique dans la monnaie locale du titre. Si aucun consensus clair n'est disponible, renvoie null pour targetPrice.`;
-        // @FIX: Removed non-standard `nullable: true` and made `targetPrice` optional by removing it from `required` array.
+        // Prompt simplifié pour plus de robustesse
+        const prompt = `Donne-moi l'objectif de cours ("targetPrice") pour les tickers : ${tickers.join(', ')}. Si un objectif n'est pas disponible, renvoie null. Sors uniquement le JSON.`;
+        
         const schema = {
             type: Type.OBJECT,
             properties: {
@@ -162,17 +158,23 @@ export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker:
                 maxOutputTokens: 1200,
             },
         });
-        const rawData = JSON.parse(cleanJsonResponse(response.text));
-        // @FIX: Handle optional targetPrice to align with return type.
-        if (rawData.targets && Array.isArray(rawData.targets)) {
-            return rawData.targets.map((t: { ticker: string; targetPrice?: number }) => ({
-                ticker: t.ticker,
-                targetPrice: t.targetPrice ?? null,
-            }));
+        
+        // Parsing sécurisé dans un try/catch local
+        try {
+            const rawData = JSON.parse(cleanJsonResponse(response.text));
+            if (rawData.targets && Array.isArray(rawData.targets)) {
+                return rawData.targets.map((t: { ticker: string; targetPrice?: number }) => ({
+                    ticker: t.ticker,
+                    targetPrice: t.targetPrice ?? null,
+                }));
+            }
+            return [];
+        } catch (parsingError) {
+            console.error("fetchOOHTargetPrices - JSON PARSING FAILED:", parsingError, "RAW:", response.text);
+            return []; // Retourne un tableau vide en cas d'erreur de parsing, pas de retry
         }
-        return [];
     }).catch(e => {
-        console.warn("fetchOOHTargetPrices a échoué, les objectifs de cours ne seront pas mis à jour.", e);
+        console.warn("fetchOOHTargetPrices a échoué après plusieurs tentatives:", e);
         return [];
     });
 }
@@ -182,16 +184,12 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
     const ai = createGenAIInstance();
     const today = new Date().toISOString().split('T')[0];
     
-    const prompt = `En tant qu'analyste financier expert du secteur OOH, recherche les données financières fondamentales les plus récentes sur Internet pour les tickers suivants : ${tickers.join(", ")}. Ne pas inclure les cours de bourse ('price') ni la variation ('change'), car ils sont gérés par un autre service.
+    const prompt = `Trouve les données financières fondamentales pour les tickers OOH suivants : ${tickers.join(", ")}. Ne pas inclure 'price' ou 'change'.
+- Pour tous les chiffres, privilégie les données **hors IFRS 16**.
+- Pour JCDecaux (DEC.PA), l'EBITDA 2024 hors IFRS 16 est d'environ 764,5 M €.
+- Inclus **sharesOutstanding (en millions)** et **dividendPerShare** pour 2024, 2025, 2026.
+- Fournis les chiffres clés demandés par le schéma JSON.`;
 
-**Instruction critique :** Pour tous les chiffres, privilégie les données **hors IFRS 16 (pre-IFRS 16)**.
-- **Point d'ancrage pour JCDecaux (DEC.PA) :** l'EBITDA 2024 hors IFRS 16 est d'environ 764,5 M €.
-- **Données à fournir :** Inclus le **nombre d'actions en circulation (sharesOutstanding) en millions** et les **dividendes par action estimés (dividendPerShare) pour 2024, 2025, et 2026** dans la monnaie locale.
-
-Fournis les chiffres clés demandés par le schéma JSON.`;
-
-    // NOTE: Le rendement du dividende (yield), le prix (price) et la variation (change)
-    // ne sont pas demandés à l'IA pour simplifier la requête et améliorer la fiabilité.
     const schema = {
       type: Type.OBJECT,
       properties: {
@@ -260,8 +258,6 @@ Fournis les chiffres clés demandés par le schéma JSON.`;
     };
   }).catch(e => {
     console.error("fetchRealTimeOOHData permanent error:", e);
-    // NOTE: En mode secours, les données de marché (prix, variation) sont neutres (0).
-    // L'UI affiche "Données de secours" pour informer l'utilisateur.
     return { 
       lastUpdated: `Données de secours (${new Date().toLocaleTimeString()})`, 
       companies: FALLBACK_COMPANIES 

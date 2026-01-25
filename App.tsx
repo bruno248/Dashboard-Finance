@@ -21,11 +21,13 @@ import { computeFinancialRatios, formatAge } from './utils';
 const CACHE_KEY = 'ooh_insight_v28_persistence';
 const FINANCIALS_TTL = 5 * 60 * 1000;
 const FUNDAMENTALS_TTL = 60 * 60 * 1000; // 1 heure
+const WEEKLY_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
+const FUNDAMENTALS_GLOBAL_TTL = WEEKLY_TTL; // 7 jours
+const MANUAL_REFRESH_COOLDOWN = 15 * 60 * 1000; // 15 minutes
 const NEWS_TTL = 15 * 60 * 1000;
 const SENTIMENT_TTL = 2 * 60 * 60 * 1000; // 2 heures
 const HIGHLIGHTS_TTL = 24 * 60 * 60 * 1000;
 const RATINGS_TTL = 24 * 60 * 60 * 1000; // 24h pour les ratings
-const WEEKLY_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'news' | 'analysis' | 'docs' | 'calendar' | 'sources' | 'screener'>('overview');
@@ -103,6 +105,16 @@ const App: React.FC = () => {
     try {
       const tickers = data.companies.map(c => c.ticker).filter(Boolean) as string[];
       const quotes = await fetchOOHQuotes(tickers);
+      
+      console.log("QUOTES RECEIVED IN refreshFinancials", quotes);
+
+      if (quotes === null) {
+        handleAiError();
+        setLoadingStatus('Impossible de mettre à jour les cours (API indisponible)');
+        setTimeout(() => setLoadingStatus(''), 3000);
+        return;
+      }
+
       handleAiSuccess();
       
       setData(prev => {
@@ -116,14 +128,29 @@ const App: React.FC = () => {
 
         return { ...prev, companies: updatedCompanies, lastUpdated: new Date().toLocaleString(), timestamps: { ...prev.timestamps, financials: Date.now() } };
       });
-    } catch(err) { console.error(err); handleAiError(); }
+    } catch(err) { 
+      console.error(err); 
+      handleAiError();
+      setLoadingStatus('Erreur de mise à jour des cours');
+      setTimeout(() => setLoadingStatus(''), 3000);
+    }
     finally { setFinancialLoading(false); setLoadingStatus(''); }
   }, [data.companies, handleAiSuccess, handleAiError]);
 
   const refreshFundamentals = useCallback(async (targetTickers?: string[]) => {
     setFinancialLoading(true);
-    const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
     const now = Date.now();
+
+    // Garde-fou pour la synchro globale (sans tickers cibles)
+    if (!targetTickers && now - (dataRef.current.timestamps?.fundamentals || 0) < FUNDAMENTALS_GLOBAL_TTL) {
+        console.log('Global fundamentals sync skipped, within 7d TTL.');
+        setLoadingStatus('Synchro globale OK (< 7j)');
+        setTimeout(() => setLoadingStatus(''), 2000);
+        setFinancialLoading(false);
+        return;
+    }
+    
+    const tickers = targetTickers || data.companies.map(c => c.ticker).filter(Boolean) as string[];
     
     try {
       setLoadingStatus('Synchro des objectifs de cours...');
@@ -148,8 +175,6 @@ const App: React.FC = () => {
           const newRatingData = ratingsResult.find(r => r.ticker.toUpperCase() === base.ticker?.toUpperCase());
           const newTargetData = targetsResult.find(t => t.ticker.toUpperCase() === base.ticker?.toUpperCase());
           
-          // Start with a full set of fallback data, layer current state, then layer new AI data.
-          // This prevents null/undefined from AI from erasing existing valid data.
           let updatedCompanyData = { ...fallbackData, ...base };
 
           if (rawData) {
@@ -170,8 +195,8 @@ const App: React.FC = () => {
 
           return { ...updatedCompanyData, ...ratios };
         });
-        const newTimestamps: Record<string, number> = { ...prev.timestamps, financials: Date.now(), fundamentals: Date.now() };
-        if (ratingsResult.length > 0) newTimestamps.ratings = Date.now();
+        const newTimestamps: Record<string, number> = { ...prev.timestamps, financials: now, fundamentals: now };
+        if (ratingsResult.length > 0) newTimestamps.ratings = now;
         return { ...prev, companies: merged, lastUpdated: syncResult.lastUpdated || new Date().toLocaleString(), timestamps: newTimestamps };
       });
     } catch (err) { console.error(err); handleAiError(); }
@@ -215,12 +240,19 @@ const App: React.FC = () => {
     setDocsLoading(true);
     setLoadingStatus('Documents...');
     try {
-      const tickers = dataRef.current.companies.map(c => c.ticker).filter(Boolean) as string[];
-      if (tickers.length === 0) {
+      const allTickers = dataRef.current.companies.map(c => c.ticker).filter(Boolean) as string[];
+      const tickersWithDocs = Object.keys(dataRef.current.companyDocuments || {}).map(t => t.toUpperCase());
+      const tickersToFetch = allTickers.filter(t => !tickersWithDocs.includes(t.toUpperCase()));
+
+      if (tickersToFetch.length === 0) {
+        console.log('All documents already cached. Skipping fetch.');
+        setLoadingStatus('Documents à jour');
+        setTimeout(() => setLoadingStatus(''), 2000);
         setDocsLoading(false);
         return;
       }
-      const docsMap = await fetchOOHDocuments(tickers);
+
+      const docsMap = await fetchOOHDocuments(tickersToFetch);
       handleAiSuccess();
       setData(prev => ({ ...prev, companyDocuments: { ...prev.companyDocuments, ...docsMap }, timestamps: { ...prev.timestamps, docs: Date.now() } }));
     } catch (err) { console.error(err); handleAiError(); }
@@ -247,11 +279,13 @@ const App: React.FC = () => {
     console.log('App Mounted: Checking for initial data refresh.');
     const now = Date.now();
     
-    if (now - (data.timestamps?.financials || 0) > FINANCIALS_TTL) {
-      console.log('Financials TTL expired, calling refreshFinancials()');
+    const hasPrices = data.companies.some(c => c.price && c.price > 0);
+    if (!hasPrices) {
+      console.log('No prices on startup, calling refreshFinancials()');
       refreshFinancials();
     }
-    if (now - (data.timestamps?.fundamentals || 0) > FUNDAMENTALS_TTL) {
+
+    if (now - (data.timestamps?.fundamentals || 0) > FUNDAMENTALS_GLOBAL_TTL) {
       console.log('Fundamentals TTL expired, calling refreshFundamentals()');
       refreshFundamentals();
     }
@@ -284,14 +318,33 @@ const App: React.FC = () => {
       refreshFinancials();
       return;
     }
+    const now = Date.now();
     switch (activeTab) {
-      case 'sources': refreshFundamentals(); break;
+      case 'sources': {
+        if (now - (data.timestamps.lastManualFundamentalsRefresh || 0) < MANUAL_REFRESH_COOLDOWN) {
+          setLoadingStatus('Cooldown actif (15 min)');
+          setTimeout(() => setLoadingStatus(''), 2000);
+          return;
+        }
+        setData(prev => ({ ...prev, timestamps: { ...prev.timestamps, lastManualFundamentalsRefresh: now } }));
+        refreshFundamentals();
+        break;
+      }
       case 'news': refreshNews(20); refreshHighlights(); break;
-      case 'docs': refreshDocs(); break;
+      case 'docs': {
+        if (now - (data.timestamps.lastManualDocsRefresh || 0) < MANUAL_REFRESH_COOLDOWN) {
+          setLoadingStatus('Cooldown actif (15 min)');
+          setTimeout(() => setLoadingStatus(''), 2000);
+          return;
+        }
+        setData(prev => ({ ...prev, timestamps: { ...prev.timestamps, lastManualDocsRefresh: now } }));
+        refreshDocs();
+        break;
+      }
       case 'calendar': refreshCalendar(); break;
       default: refreshFinancials(); break;
     }
-  }, [activeTab, selectedCompany, refreshFinancials, refreshFundamentals, refreshNews, refreshHighlights, refreshDocs, refreshCalendar]);
+  }, [activeTab, selectedCompany, data.timestamps, refreshFinancials, refreshFundamentals, refreshNews, refreshHighlights, refreshDocs, refreshCalendar]);
 
   const handleSelectCompany = useCallback((company: Company) => {
     setSelectedCompany(company);

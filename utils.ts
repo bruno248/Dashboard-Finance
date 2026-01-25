@@ -144,20 +144,50 @@ export const computeFinancialRatios = (companyData: Partial<Company>): Partial<C
 
 
 /**
- * Nettoie les réponses JSON de l'IA qui peuvent contenir du Markdown
+ * Nettoie les réponses JSON de l'IA qui peuvent contenir du Markdown ou des erreurs de formatage.
  */
 export function cleanJsonResponse(text: string | undefined): string {
   if (!text) return "{}";
+
+  // 1. Supprimer les balises Markdown et les espaces superflus
   let cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+  // 2. Trouver le début réel du contenu JSON
   const firstBrace = cleaned.indexOf('{');
   const firstBracket = cleaned.indexOf('[');
   
   let start = -1;
-  if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
-  else start = firstBrace !== -1 ? firstBrace : firstBracket;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    start = Math.min(firstBrace, firstBracket);
+  } else {
+    start = firstBrace !== -1 ? firstBrace : firstBracket;
+  }
 
   if (start === -1) return "{}";
-  return cleaned.substring(start);
+  let jsonPart = cleaned.substring(start);
+  
+  // 3. Corriger les sauts de ligne invalides à l'intérieur des chaînes de caractères
+  // C'est une erreur fréquente où l'IA insère un \n littéral au lieu d'un \\n.
+  let inString = false;
+  let result = '';
+  for (let i = 0; i < jsonPart.length; i++) {
+    const char = jsonPart[i];
+    
+    // Basculer l'état `inString` si on rencontre un guillemet non échappé
+    if (char === '"' && (i === 0 || jsonPart[i-1] !== '\\')) {
+      inString = !inString;
+    }
+    
+    // Si nous sommes dans une chaîne et que nous trouvons un saut de ligne,
+    // on le remplace par un espace pour rendre le JSON valide.
+    if (inString && (char === '\n' || char === '\r')) {
+      result += ' ';
+    } else {
+      result += char;
+    }
+  }
+
+  return result;
 }
 
 /**
