@@ -38,7 +38,14 @@ const FALLBACK_QUOTES: { ticker: string; price: number; change: number }[] = [];
 export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: string; price: number; change: number }[]> {
   return withRetry(async () => {
     const ai = createGenAIInstance();
-    const prompt = `Get the latest stock price and percentage change for these tickers: ${tickers.join(", ")}.`;
+    const prompt = `En tant qu'API de données financières, récupère le dernier cours de clôture ('price') et la variation en pourcentage par rapport à la veille ('change') pour les tickers suivants : ${tickers.join(", ")}.
+
+**Règles impératives :**
+- La réponse DOIT être un objet JSON valide, strictement conforme au schéma fourni.
+- Le prix doit être un nombre dans la monnaie locale du titre.
+- Si un ticker est invalide ou introuvable, ne l'inclus pas dans la réponse.
+- N'inclus aucun texte en dehors de l'objet JSON.`;
+
     const schema = {
       type: Type.OBJECT,
       properties: {
@@ -49,7 +56,7 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
             properties: {
               ticker: { type: Type.STRING },
               price: { type: Type.NUMBER },
-              change: { type: Type.NUMBER },
+              change: { type: Type.NUMBER, description: "Variation en pourcentage, ex: -1.25" },
             },
             required: ["ticker", "price", "change"],
           },
@@ -58,7 +65,7 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
       required: ["quotes"],
     };
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -67,11 +74,15 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
         temperature: 0.1,
       },
     });
+
+    console.log('IA raw response for quotes:', response.text);
     const rawData = JSON.parse(cleanJsonResponse(response.text));
-    return rawData.quotes || FALLBACK_QUOTES.filter(q => tickers.includes(q.ticker));
+    console.log('Parsed quotes data:', rawData);
+
+    return rawData.quotes || [];
   }).catch(e => {
-    console.error("fetchOOHQuotes failed:", e);
-    return FALLBACK_QUOTES.filter(q => tickers.includes(q.ticker));
+    console.error("fetchOOHQuotes a échoué après plusieurs tentatives:", e);
+    return [];
   });
 }
 
@@ -171,7 +182,7 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
     const ai = createGenAIInstance();
     const today = new Date().toISOString().split('T')[0];
     
-    const prompt = `En tant qu'analyste financier expert du secteur OOH, recherche les données les plus récentes sur Internet pour les tickers suivants : ${tickers.join(", ")}.
+    const prompt = `En tant qu'analyste financier expert du secteur OOH, recherche les données financières fondamentales les plus récentes sur Internet pour les tickers suivants : ${tickers.join(", ")}. Ne pas inclure les cours de bourse ('price') ni la variation ('change'), car ils sont gérés par un autre service.
 
 **Instruction critique :** Pour tous les chiffres, privilégie les données **hors IFRS 16 (pre-IFRS 16)**.
 - **Point d'ancrage pour JCDecaux (DEC.PA) :** l'EBITDA 2024 hors IFRS 16 est d'environ 764,5 M €.
@@ -179,8 +190,8 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
 
 Fournis les chiffres clés demandés par le schéma JSON.`;
 
-    // NOTE: Le rendement du dividende (yield) n'est pas demandé à l'IA,
-    // il est calculé localement dans l'application pour plus de précision.
+    // NOTE: Le rendement du dividende (yield), le prix (price) et la variation (change)
+    // ne sont pas demandés à l'IA pour simplifier la requête et améliorer la fiabilité.
     const schema = {
       type: Type.OBJECT,
       properties: {
@@ -191,8 +202,6 @@ Fournis les chiffres clés demandés par le schéma JSON.`;
             type: Type.OBJECT,
             properties: {
               ticker: { type: Type.STRING },
-              price: { type: Type.NUMBER },
-              change: { type: Type.NUMBER },
               netDebt: { type: Type.STRING },
               sharesOutstanding: { type: Type.NUMBER, description: "Number of shares in millions" },
               dividendPerShare2024: { type: Type.STRING },
@@ -218,7 +227,7 @@ Fournis les chiffres clés demandés par le schéma JSON.`;
               fcf2026: { type: Type.STRING },
             },
             required: [
-              "ticker", "price", "change", "netDebt", "sharesOutstanding",
+              "ticker", "netDebt", "sharesOutstanding",
               "revenue2024", "revenue2025", "revenue2026",
               "ebitda2024", "ebitda2025", "ebitda2026",
               "ebit2024", "ebit2025", "ebit2026",

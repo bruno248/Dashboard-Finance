@@ -61,7 +61,9 @@ En tant qu'analyste financier, trouve jusqu'à ${maxCount} actualités pertinent
 
 **Règles de formatage JSON impératives (la requête échouera si non respectées) :**
 - **Format JSON strict** : La réponse doit être un objet JSON valide qui respecte le schéma.
-- **Échappement OBLIGATOIRE des guillemets** : Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés (par ex. \`"title": "Une news sur \\"Big News\\" Inc."\`).
+- **Échappement OBLIGATOIRE des guillemets** : C'est la cause d'erreur la plus fréquente. Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés avec un backslash (\\).
+    - **Exemple correct :** \`{"title": "L'entreprise annonce un \\"partenariat stratégique\\""}\`
+    - **Exemple INCORRECT :** \`{"title": "L'entreprise annonce un "partenariat stratégique""}\`
 - **Cas vide** : Si aucune actualité n'est trouvée, renvoyer \`{"news": []}\`.
 - **Tags valides** : Le tag doit être l'un des suivants : ${simplifiedTagsDescription}.`,
       config: { 
@@ -73,11 +75,18 @@ En tant qu'analyste financier, trouve jusqu'à ${maxCount} actualités pertinent
         thinkingConfig: { thinkingBudget: maxCount === 5 ? 512 : 1024 },
       }
     });
-    console.log('IA response for news:', response.text);
-    const parsed = JSON.parse(cleanJsonResponse(response.text));
-    return parsed.news || FALLBACK_NEWS;
-  }).catch((error) => {
-    console.error("fetchOOHNews failed:", error);
+    
+    const rawResponseText = response.text;
+    console.log('IA response for news:', rawResponseText);
+    try {
+      const parsed = JSON.parse(cleanJsonResponse(rawResponseText));
+      return parsed.news || FALLBACK_NEWS;
+    } catch (parsingError) {
+      console.error("fetchOOHNews - JSON PARSING FAILED:", parsingError, "RAW:", rawResponseText);
+      return FALLBACK_NEWS;
+    }
+  }).catch((apiError) => {
+    console.error("fetchOOHNews - API CALL FAILED after retries:", apiError);
     return FALLBACK_NEWS;
   });
 };
@@ -98,7 +107,9 @@ sur le secteur de la communication extérieure (OOH).
 
 **Règles de formatage JSON impératives :**
 - **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma.
-- **Échappement OBLIGATOIRE des guillemets** : Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés (ex: \`"title": "Un titre avec des \\"guillemets\\""\`).
+- **Échappement OBLIGATOIRE des guillemets** : C'est la cause d'erreur la plus fréquente. Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés avec un backslash (\\).
+    - **Exemple correct :** \`{"title": "L'entreprise annonce un \\"partenariat stratégique\\""}\`
+    - **Exemple INCORRECT :** \`{"title": "L'entreprise annonce un "partenariat stratégique""}\`
 - **Tags valides** : Le tag doit être l'un des suivants : ${simplifiedTagsDescription}.
 - **Cas vide** : Si rien n'est trouvé, retourner \`{"highlights": []}\`.`,
       config: {
@@ -110,10 +121,17 @@ sur le secteur de la communication extérieure (OOH).
         thinkingConfig: { thinkingBudget: 1024 },
       }
     });
-    const parsed = JSON.parse(cleanJsonResponse(response.text));
-    return parsed.highlights || FALLBACK_HIGHLIGHTS;
-  }).catch((error) => {
-    console.error("fetchOOHHighlights failed:", error);
+
+    const rawResponseText = response.text;
+    try {
+      const parsed = JSON.parse(cleanJsonResponse(rawResponseText));
+      return parsed.highlights || FALLBACK_HIGHLIGHTS;
+    } catch (parsingError) {
+      console.error("fetchOOHHighlights - JSON PARSING FAILED:", parsingError, "RAW:", rawResponseText);
+      return FALLBACK_HIGHLIGHTS;
+    }
+  }).catch((apiError) => {
+    console.error("fetchOOHHighlights - API CALL FAILED after retries:", apiError);
     return FALLBACK_HIGHLIGHTS;
   });
 };
@@ -167,6 +185,12 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
     propertyOrdering: ["label", "description", "keyTakeaways"],
   };
 
+  const parsingErrorFallback = {
+    label: "Analyse Indisponible",
+    description: "Le service d'analyse a renvoyé un format de données incorrect.",
+    keyTakeaways: []
+  };
+
   try {
     const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
@@ -184,8 +208,8 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
         responseMimeType: "application/json",
         responseSchema: sentimentSchema,
         temperature: 0.2,
-        maxOutputTokens: 1200,
-        thinkingConfig: { thinkingBudget: 400 },
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingBudget: 512 },
       }
     });
     
@@ -199,11 +223,7 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
       return { ...fallback, label: "Analyse Invalide", description: "La structure de la réponse IA est inattendue." };
     } catch (parsingError) {
       console.error("fetchOOHSentimentFromNews - JSON PARSING FAILED:", parsingError, "RAW:", rawResponseText);
-      return {
-        ...fallback,
-        label: "Analyse Indisponible",
-        description: "Le service d'analyse a renvoyé un format de données incorrect."
-      };
+      return parsingErrorFallback;
     }
   } catch (apiError) {
     console.error("fetchOOHSentimentFromNews - API CALL FAILED:", apiError);

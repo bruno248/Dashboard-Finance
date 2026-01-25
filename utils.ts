@@ -174,7 +174,8 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 15
 
     const isRetryable = 
       (errorCode === 429 || errorStatus === 'resource_exhausted' || errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) || // Rate limit
-      (errorCode === 503 || errorStatus === 'unavailable' || errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('try again')); // Service unavailable
+      (errorCode === 503 || errorStatus === 'unavailable' || errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('try again')) || // Service unavailable
+      (errorCode === 500 || errorMessage.includes('500') || errorStatus.includes('internal')); // Internal server error
 
     if (retries > 0 && isRetryable) {
       console.warn(`API temporairement indisponible (code: ${errorCode || 'N/A'}, status: ${errorStatus || 'N/A'}). Nouvel essai dans ${delay}ms... (${retries} restants)`);

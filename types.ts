@@ -27,8 +27,8 @@ export type HistoricalPricesPayload = {
 // Type pour les données brutes de l'IA
 export interface RawCompanyFromAI {
   ticker: string;
-  price: number;
-  change: number;
+  price?: number;
+  change?: number;
   netDebt: string;
   sharesOutstanding: number;
   dividendPerShare2024?: string;

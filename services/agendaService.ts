@@ -34,11 +34,13 @@ export const fetchOOHAgenda = async (): Promise<EventItem[]> => {
     const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Trouve les prochains événements financiers (publications de résultats, journées investisseurs, assemblées générales) pour les entreprises du secteur OOH suivantes : ${companyList}, attendus dans les 12 prochains mois.
+      contents: `Trouve jusqu'à 15 des prochains événements financiers (publications de résultats, journées investisseurs, assemblées générales) pour les entreprises du secteur OOH suivantes : ${companyList}, attendus dans les 12 prochains mois.
 
 **Règles de formatage impératives :**
 - **Format JSON strict** : La réponse doit être un objet JSON qui respecte le schéma. Toutes les clés et les valeurs de type chaîne de caractères doivent être entourées de guillemets doubles ("").
-- **Échappement des chaînes** : Les guillemets (") dans les titres DOIVENT être échappés (par ex. \`\\"titre de l'événement\\"\`).
+- **Échappement OBLIGATOIRE des guillemets** : C'est la cause d'erreur la plus fréquente. Les guillemets (") dans les titres ou toute autre valeur de chaîne DOIVENT être échappés avec un backslash (\\).
+    - **Exemple correct :** \`{"title": "Journée investisseurs \\"Vision 2025\\""}\`
+    - **Exemple INCORRECT :** \`{"title": "Journée investisseurs "Vision 2025""}\`
 - **Date précise** : Assure-toi que chaque événement a une date précise au format 'YYYY-MM-DD'.
 - **Cas vide** : Si aucun événement n'est trouvé, renvoyer \`{"events": []}\` est obligatoire.
 - **Ne pas inventer** : N'invente pas d'événements si aucune information n'est disponible.`,
@@ -47,7 +49,7 @@ export const fetchOOHAgenda = async (): Promise<EventItem[]> => {
         responseMimeType: "application/json",
         responseSchema: agendaSchema,
         temperature: 0.2,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
         thinkingConfig: { thinkingBudget: 1024 },
       }
     });

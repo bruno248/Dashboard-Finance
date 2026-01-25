@@ -252,10 +252,25 @@ const App: React.FC = () => {
       console.log('Financials TTL expired, calling refreshFinancials()');
       refreshFinancials();
     }
-    
+    if (now - (data.timestamps?.fundamentals || 0) > FUNDAMENTALS_TTL) {
+      console.log('Fundamentals TTL expired, calling refreshFundamentals()');
+      refreshFundamentals();
+    }
     if (now - (data.timestamps?.news || 0) > NEWS_TTL) {
       console.log('News TTL expired, calling refreshNews()');
       refreshNews();
+    }
+    if (now - (data.timestamps?.calendar || 0) > CALENDAR_TTL) {
+      console.log('Calendar TTL expired, calling refreshCalendar()');
+      refreshCalendar();
+    }
+    if (now - (data.timestamps?.docs || 0) > DOCS_TTL) {
+        console.log('Docs TTL expired, calling refreshDocs()');
+        refreshDocs();
+    }
+    if (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL) {
+        console.log('Highlights TTL expired, calling refreshHighlights()');
+        refreshHighlights();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -285,6 +300,7 @@ const App: React.FC = () => {
 
   const dataAges = useMemo(() => ({
     financials: formatAge(data.timestamps.financials),
+    fundamentals: formatAge(data.timestamps.fundamentals),
     news: formatAge(data.timestamps.news),
     calendar: formatAge(data.timestamps.calendar),
     docs: formatAge(data.timestamps.docs),
@@ -309,7 +325,7 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-slate-900 text-slate-50 overflow-x-hidden">
       <Sidebar activeTab={selectedCompany ? '' : activeTab} setActiveTab={handleTabChange} aiStatus={data.aiStatus} />
-      <main className="flex-1 md:ml-60 flex flex-col p-4 md:p-8 relative">
+      <main className="flex-1 md:ml-60 flex flex-col p-4 md:p-8 relative min-w-0">
         <Header 
           title={selectedCompany ? selectedCompany.name : "OOH Terminal"} 
           subtitle={loadingStatus || `Dernière synchro : ${data.lastUpdated}`} 

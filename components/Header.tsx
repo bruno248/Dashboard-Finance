@@ -10,6 +10,7 @@ interface HeaderProps {
   loading?: boolean;
   dataAges?: {
     financials: string;
+    fundamentals: string;
     news: string;
     calendar: string;
     docs: string;
@@ -39,8 +40,10 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle, onBack, onRefresh, onS
               <span>News: <span className="font-bold text-slate-400">{dataAges.news}</span></span>
               <span className="text-slate-600 hidden sm:inline">•</span>
               <span>Agenda: <span className="font-bold text-slate-400">{dataAges.calendar}</span></span>
-               <span className="text-slate-600 hidden sm:inline">•</span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
               <span>Docs: <span className="font-bold text-slate-400">{dataAges.docs}</span></span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
+              <span>Fondamentaux: <span className="font-bold text-slate-400">{dataAges.fundamentals}</span></span>
             </div>
           )}
         </div>
