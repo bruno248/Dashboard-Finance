@@ -39,7 +39,7 @@ export async function fetchOOHQuotes(tickers: string[]): Promise<{ ticker: strin
   console.log("QUOTES REQUEST TICKERS", tickers);
   return withRetry(async () => {
     const ai = createGenAIInstance();
-    const prompt = `Récupère le dernier cours ('price') et la variation journalière ('change' en %) pour les tickers suivants : ${tickers.join(", ")}. Renvoie uniquement le JSON.`;
+    const prompt = `Récupère le dernier cours ('price') et la variation journalière ('change' en %) pour les tickers suivants du secteur de la communication extérieure (OOH) : ${tickers.join(", ")}. (Note: CCO est Clear Channel Outdoor). Renvoie uniquement le JSON.`;
 
     const schema = {
       type: Type.OBJECT,
@@ -85,7 +85,7 @@ export async function fetchOOHRatings(tickers: string[]): Promise<{ ticker: stri
     return withRetry(async () => {
         const ai = createGenAIInstance();
         const ratingEnumValues = Object.values(AnalystRating).join("', '");
-        const prompt = `Pour les tickers suivants : ${tickers.join(', ')}, trouve le consensus de recommandation des analystes (analyst rating consensus). Mappe le résultat à l'une de ces valeurs exactes : '${ratingEnumValues}'. Si le consensus n'est pas clair, ne renvoie rien pour ce ticker.`;
+        const prompt = `Pour les tickers suivants du secteur de la communication extérieure (OOH) : ${tickers.join(', ')}, trouve le consensus de recommandation des analystes. (Note: CCO est Clear Channel Outdoor). Mappe le résultat à l'une de ces valeurs exactes : '${ratingEnumValues}'. Si le consensus n'est pas clair, ne renvoie rien pour ce ticker.`;
         const schema = {
             type: Type.OBJECT,
             properties: {
@@ -126,8 +126,7 @@ export async function fetchOOHRatings(tickers: string[]): Promise<{ ticker: stri
 export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker: string; targetPrice: number | null }[]> {
     return withRetry(async () => {
         const ai = createGenAIInstance();
-        // Prompt simplifié pour plus de robustesse
-        const prompt = `Donne-moi l'objectif de cours ("targetPrice") pour les tickers : ${tickers.join(', ')}. Si un objectif n'est pas disponible, renvoie null. Sors uniquement le JSON.`;
+        const prompt = `Donne-moi l'objectif de cours ("targetPrice") pour les tickers du secteur OOH (communication extérieure) suivants : ${tickers.join(', ')}. Note: CCO est Clear Channel Outdoor, une société de médias, pas Cameco, une société minière. Si un objectif n'est pas disponible, renvoie null. Sors uniquement le JSON.`;
         
         const schema = {
             type: Type.OBJECT,
@@ -155,11 +154,11 @@ export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker:
                 responseMimeType: "application/json",
                 responseSchema: schema,
                 temperature: 0.2,
-                maxOutputTokens: 1200,
+                maxOutputTokens: 2048,
+                thinkingConfig: { thinkingBudget: 512 },
             },
         });
         
-        // Parsing sécurisé dans un try/catch local
         try {
             const rawData = JSON.parse(cleanJsonResponse(response.text));
             if (rawData.targets && Array.isArray(rawData.targets)) {
@@ -171,7 +170,7 @@ export async function fetchOOHTargetPrices(tickers: string[]): Promise<{ ticker:
             return [];
         } catch (parsingError) {
             console.error("fetchOOHTargetPrices - JSON PARSING FAILED:", parsingError, "RAW:", response.text);
-            return []; // Retourne un tableau vide en cas d'erreur de parsing, pas de retry
+            return [];
         }
     }).catch(e => {
         console.warn("fetchOOHTargetPrices a échoué après plusieurs tentatives:", e);
@@ -184,7 +183,8 @@ export async function fetchRealTimeOOHData(tickers: string[]): Promise<{ lastUpd
     const ai = createGenAIInstance();
     const today = new Date().toISOString().split('T')[0];
     
-    const prompt = `Trouve les données financières fondamentales pour les tickers OOH suivants : ${tickers.join(", ")}. Ne pas inclure 'price' ou 'change'.
+    const prompt = `Trouve les données financières fondamentales pour les tickers OOH suivants : ${tickers.join(", ")}.
+- Pour le ticker CCO, assure-toi de chercher "Clear Channel Outdoor Holdings", pas Cameco Corp.
 - Pour tous les chiffres, privilégie les données **hors IFRS 16**.
 - Pour JCDecaux (DEC.PA), l'EBITDA 2024 hors IFRS 16 est d'environ 764,5 M €.
 - Inclus **sharesOutstanding (en millions)** et **dividendPerShare** pour 2024, 2025, 2026.
@@ -284,6 +284,50 @@ export async function queryCompanyAI(prompt: string, context: SectorData): Promi
       }
     });
 
+    if (prompt.toLowerCase().includes("sensibilité")) {
+      console.log("AI sensitivity raw response:", response.text);
+    }
+
     return response.text || "Analyse indisponible pour le moment.";
   }).catch(() => "L'IA est actuellement saturée ou la réponse est vide. Réessayez plus tard.");
+}
+
+export async function queryMeetingQA(prompt: string, context: SectorData): Promise<string> {
+  return withRetry(async () => {
+    const ai = createGenAIInstance();
+    const simplifiedContext = context.companies.map(c => ({ t: c.ticker, r25: c.revenue2025, eb25: c.ebitda2025, per25: c.perForward, yield25: c.dividendYield2025 }));
+    
+    const fullPrompt = `En tant qu'analyste financier expert du secteur OOH, prépare une session de Q&A.
+    
+    Contexte de la réunion : "${prompt}"
+    Données sectorielles de base : ${JSON.stringify(simplifiedContext)}
+    
+    **Instructions strictes :**
+    1.  Génère une liste de 5 à 7 questions probables d'investisseurs.
+    2.  Pour chaque question, fournis une réponse synthétique et chiffrée.
+    3.  **Le format de sortie est IMPÉRATIF et ne doit contenir aucun autre texte :**
+        - Chaque question doit commencer par \`Q:\`
+        - Chaque réponse doit commencer par \`R:\`
+        - Chaque bloc Q/R doit être séparé par un saut de ligne.
+    
+    **Exemple de format à suivre :**
+    Q: Quelle est votre vision sur la croissance du DOOH ?
+    R: Nous anticipons une croissance de 10-12% en 2025, tirée par...
+    Q: Comment gérez-vous l'inflation des coûts ?
+    R: Nous avons sécurisé 80% de nos contrats d'énergie et nous passons...
+    
+    **Ne renvoie RIEN d'autre que les blocs Q:/R:. Pas d'introduction, pas de conclusion.**`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: fullPrompt,
+       config: {
+        temperature: 0.3,
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingBudget: 1024 },
+      }
+    });
+
+    return response.text || "Analyse Q&A indisponible.";
+  }).catch(() => "Le service Q&A est actuellement indisponible.");
 }

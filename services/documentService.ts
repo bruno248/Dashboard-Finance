@@ -48,7 +48,7 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
     // Prompt renforcé avec un exemple de structure explicite
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Pour chaque ticker (${tickers.join(", ")}), trouve 2-4 rapports financiers récents.
+      contents: `Pour chaque ticker du secteur OOH (communication extérieure) (${tickers.join(", ")}), trouve 2-4 rapports financiers récents. Pour le ticker CCO, il s'agit de Clear Channel Outdoor.
 
 **RÈGLES DE FORMATAGE IMPÉRATIVES :**
 1.  **Structure JSON stricte :** La réponse DOIT être un objet JSON unique contenant une seule clé principale : \`"documentsByTicker"\`.
@@ -80,8 +80,8 @@ export const fetchOOHDocuments = async (tickers: string[]): Promise<DocumentFetc
         responseMimeType: "application/json",
         responseSchema: docSchema,
         temperature: 0.2,
-        maxOutputTokens: 2048,
-        thinkingConfig: { thinkingBudget: 1024 },
+        maxOutputTokens: 8192,
+        thinkingConfig: { thinkingBudget: 2048 },
       }
     });
 

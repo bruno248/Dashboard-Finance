@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
-import { Company, SectorData } from '../types';
+import { Company, SectorData, NewsTag } from '../types';
 import { MarketTable } from './MarketTable';
 import Modal from './Modal';
+import SectorBenchmark from './SectorBenchmark';
 
 interface DashboardOverviewProps {
   data: SectorData;
@@ -52,6 +53,18 @@ const SentimentModal: React.FC<{ sentiment: NonNullable<SectorData['sentiment']>
   </Modal>
 );
 
+const getTagStyle = (tag: NewsTag) => {
+    switch (tag?.toLowerCase()) {
+      case 'deals': return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      case 'digital': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+      case 'earnings': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'corporate': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'regulation': return 'bg-rose-500/10 text-rose-300 border-rose-500/30';
+      case 'market':
+      default:
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    }
+};
 
 const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCompany }) => {
   const [yearView, setYearView] = useState<'2025' | '2026'>('2025');
@@ -88,9 +101,9 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
     <>
       <div className="space-y-4 md:space-y-8 animate-in fade-in duration-700 pb-20">
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-          
-          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl">
+        {/* STATS CARDS & WIDGETS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-6">
+          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl h-full">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Multiple Sectoriel</h3>
               <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700">
@@ -104,7 +117,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
             </div>
           </div>
 
-          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl flex flex-col justify-center">
+          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl flex flex-col justify-center h-full">
             <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-3">Potentiel de Hausse</h3>
             <div className="flex items-baseline gap-2">
               {stats.hasUpsideData ? (
@@ -115,10 +128,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
               <span className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Upside Moyen</span>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl">
+          <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl h-full">
             <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Top Variations</h3>
             <div className="space-y-3">
               {topMovers.map(c => (
@@ -135,7 +146,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
           <button
               onClick={() => data.sentiment && setIsSentimentModalOpen(true)}
               disabled={!data.sentiment}
-              className="bg-emerald-900/10 p-4 md:p-6 rounded-xl md:rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col justify-between text-left relative transition-all hover:border-emerald-500/50 disabled:cursor-not-allowed group"
+              className="w-full h-full bg-emerald-900/10 p-4 md:p-6 rounded-xl md:rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col justify-between text-left relative transition-all hover:border-emerald-500/50 disabled:cursor-not-allowed group"
           >
             <div className="flex-1">
                 <AIBadge />
@@ -172,43 +183,42 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ data, onSelectCom
           </button>
         </div>
 
-        <section>
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-base md:text-xl font-bold text-white">Cotes Sectorielles (LC)</h2>
-          </div>
-          <MarketTable companies={companies} onSelectCompany={onSelectCompany} />
-        </section>
+        {/* MAIN LAYOUT GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <section className="lg:col-span-3">
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h2 className="text-base md:text-xl font-bold text-white">Cotes Sectorielles (LC)</h2>
+            </div>
+            <MarketTable companies={companies} onSelectCompany={onSelectCompany} />
+          </section>
 
-        <section className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-base md:text-lg font-bold text-white">Flux d'actualités</h2>
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Dernières 24h</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {data.news.map((n, idx) => {
-              const safeUrl = n.url && /^https?:\/\//.test(n.url) ? n.url : null;
-              const href = safeUrl || `https://www.google.com/search?q=${encodeURIComponent(n.title + ' ' + n.source)}`;
-              return (
-              <a 
-                key={idx} 
-                href={href} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="bg-slate-800/40 p-3 md:p-4 rounded-lg md:rounded-2xl border border-slate-700/50 hover:border-emerald-500/30 transition-all group block"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
-                    n.tag === 'Deals' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-900 text-emerald-400 border-slate-700'
-                  }`}>
-                    {n.tag || 'Market'}
-                  </span>
-                  <span className="text-[8px] font-bold text-slate-600 uppercase">{n.source} • {n.time}</span>
-                </div>
-                <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors leading-snug line-clamp-2">{n.title}</p>
-              </a>
-              );
-            })}
-          </div>
+          <aside className="lg:col-span-2 space-y-6">
+            <div className="bg-slate-800 p-4 md:p-6 rounded-xl md:rounded-3xl border border-slate-700 shadow-xl">
+              <h3 className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-4">Dernières Dépêches</h3>
+              <div className="space-y-4">
+                {(data.news || []).slice(0, 10).map((item, idx) => (
+                  <div key={item.id || idx}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${getTagStyle(item.tag)}`}>
+                        {item.tag || 'Market'}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-600 uppercase">
+                        {item.source} • {item.time}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-200 leading-snug line-clamp-2">
+                      {item.title}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* BENCHMARK (Full Width) */}
+        <section className="mt-6">
+          <SectorBenchmark data={data} initialMetric="evEbitda" initialYear="Forward" showControls={false} />
         </section>
       </div>
 

@@ -55,7 +55,7 @@ export const fetchOOHNews = async (maxCount: number = 5): Promise<NewsItem[]> =>
 En tant qu'analyste financier, trouve jusqu'à ${maxCount} actualités pertinentes publiées au cours des 7 derniers jours sur le secteur de la communication extérieure (OOH).
 
 **Stratégie de recherche :**
-1.  **Sociétés clés** : Recherche des actualités sur JCDecaux, Lamar, Ströer, Clear Channel, Outfront Media.
+1.  **Sociétés clés** : Recherche des actualités sur JCDecaux, Lamar, Ströer, Clear Channel Outdoor (CCO), Outfront Media.
 2.  **Thèmes généraux** : Élargis la recherche à des termes comme "DOOH", "digital billboards", "outdoor advertising market".
 3.  **Qualité avant tout** : Ton objectif principal est de renvoyer des articles réels et vérifiables. Il est acceptable de retourner moins de ${maxCount} articles si la recherche n'est pas fructueuse. N'invente jamais de news.
 
@@ -98,7 +98,7 @@ export const fetchOOHHighlights = async (): Promise<NewsItem[]> => {
       model: "gemini-3-flash-preview", 
       contents: `
 Récupère 10 à 15 actualités MARQUANTES publiées au cours des 12 DERNIERS MOIS 
-sur le secteur de la communication extérieure (OOH).
+sur le secteur de la communication extérieure (OOH), en particulier pour JCDecaux, Lamar, Ströer, Clear Channel Outdoor (CCO), et Outfront Media.
 
 **Contraintes fortes :**
 - Ne sélectionne que des événements significatifs (M&A majeur, résultats annuels, changement de direction, innovation technologique importante).
@@ -117,7 +117,7 @@ sur le secteur de la communication extérieure (OOH).
         responseMimeType: "application/json",
         responseSchema: highlightsSchema,
         temperature: 0.3,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
         thinkingConfig: { thinkingBudget: 1024 },
       }
     });
@@ -226,6 +226,16 @@ export const fetchOOHSentimentFromNews = async (news: NewsItem[]): Promise<{ lab
       return parsingErrorFallback;
     }
   } catch (apiError) {
+    const errorString = String(apiError).toLowerCase();
+    if (errorString.includes('503') || errorString.includes('unavailable') || errorString.includes('overloaded')) {
+      console.warn("fetchOOHSentimentFromNews - Model overloaded (503), returning fallback.");
+      return {
+        label: "Analyse Indisponible",
+        description: "Le modèle d'analyse est momentanément indisponible (erreur 503).",
+        keyTakeaways: []
+      };
+    }
+    
     console.error("fetchOOHSentimentFromNews - API CALL FAILED:", apiError);
     return {
       ...fallback,

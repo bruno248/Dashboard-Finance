@@ -45,7 +45,8 @@ export const fetchHistoricalPrices = async (period: "1M" | "3M" | "6M" | "1Y", t
     const ai = createGenAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Pour les tickers suivants : ${tickers.join(", ")}, fournis ${numPoints} points de données clés de l'historique des cours sur la période passée de ${period}. 
+      contents: `Pour les tickers suivants du secteur OOH (communication extérieure) : ${tickers.join(", ")}, fournis ${numPoints} points de données clés de l'historique des cours sur la période passée de ${period}.
+      Note importante: CCO est Clear Channel Outdoor, pas Cameco.
       Par exemple, pour '1Y', donne le cours d'aujourd'hui, d'il y a ~1 mois, ~3 mois, ~6 mois, ~9 mois, et ~12 mois. 
       Inclus toujours le point le plus récent et le plus ancien de la période.`,
       config: { 
