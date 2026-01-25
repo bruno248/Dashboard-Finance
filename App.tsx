@@ -290,8 +290,8 @@ const App: React.FC = () => {
       refreshFundamentals();
     }
     if (now - (data.timestamps?.news || 0) > NEWS_TTL) {
-      console.log('News TTL expired, calling refreshNews()');
-      refreshNews();
+      console.log('News TTL expired, calling refreshNews(10)');
+      refreshNews(10);
     }
     if (now - (data.timestamps?.highlights || 0) > HIGHLIGHTS_TTL) {
       console.log('Highlights TTL expired, calling refreshHighlights()');
